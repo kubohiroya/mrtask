@@ -1,4 +1,3 @@
-src/utils.ts
 import fs from "node:fs/promises";
 import * as fss from "node:fs";
 import path from "node:path";
