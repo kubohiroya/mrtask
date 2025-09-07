@@ -55,3 +55,62 @@ mrtask list
 
 # Mark the task as done
 mrtask done 2025-09-08T14-03-12Z-feature-login-ui
+```
+
+## A task YAML looks like this:
+```yaml
+id: 2025-09-08T14-03-12Z-feature-login-ui
+createdAt: 2025-09-08T14:03:12Z
+branch: feature/login-ui
+title: Implement login page
+description: Create new login form with validation
+status: open
+primaryDir: packages/app
+workDirs:
+  - packages/app
+tags: [ui, auth]
+checklist: []
+relatedPRs: []
+assignees: []
+```
+
+## Installation
+
+### ⚠️ mrtask is currently experimental.
+
+Build from source
+```bash
+git clone https://github.com/yourname/mrtask.git
+cd mrtask
+pnpm install
+pnpm build
+pnpm link --global
+```
+
+## Requirements
+
+* Git ≥ 2.20 (for worktree support)
+* Node.js ≥ 18
+* pnpm ≥ 8 (recommended for mono-repo scanning)
+
+## Roadmap
+
+* Interactive task creation wizard.
+* Integration with git sparse-checkout.
+* mrtask doctor for broken symlinks and orphaned tasks.
+* mrtask pr to scaffold pull request templates.
+* CI/CD hooks for automated task validation.
+
+## Why .mrtask/?
+
+Each package (or the repo root) has its own .mrtask/ directory.
+This isolates task metadata from source code while making it easy to search and script around.
+
+## Contributing
+
+Contributions are welcome!
+Please open issues for bugs or feature requests, and feel free to send pull requests.
+
+## License
+
+MIT
