@@ -19,11 +19,12 @@ with YAML metadata that makes tasks searchable, sharable, and automatable.
 
 ## 🔑 Features
 
-- ➕ **Task creation** with `mrtask add`
-- 📂 **Multiple directories** supported (symlinked task files)
-- 🔄 **Task lifecycle commands**: `done`, `cancel`, `remove`
-- 🛡️ **Safety guards** (main branch enforcement, single worktree per branch)
-- 📋 **Listing and querying** with `mrtask list`
+- ➕ `mrtask add` — create a task YAML and a git worktree
+- 📋 `mrtask list/show` — query tasks across workspaces
+- ✅ `mrtask done/cancel/remove` — move or delete task records, remove worktrees
+- 🩺 `mrtask doctor` — basic integrity checks
+- 🔀 `mrtask pr` — **Stage-2**: build a PR draft from Task + Git diff, optionally `--push` the branch and open compare/PR (GitHub gh optional)
+
 
 ---
 
@@ -158,6 +159,31 @@ Show or edit configuration (e.g. CSV column mapping, default branch).
 
     # ✅ Complete the task
     mrtask done 2025-09-08T14-03-12Z-feature-login-ui
+
+---
+### `mrtask pr` 🔀
+Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current git diff.
+
+    mrtask pr <task-id> [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]
+
+- `--dry-run` (default): Print PR **draft** (Title/Body) and a **compare URL** if available.
+  - Saves the draft to `.mrtask/out/<id>.pr.md`
+  - With `--open`, opens the compare URL in a browser.
+- `--push`: Push the branch to `<remote>` and set upstream (safe to use with `--dry-run`).
+- If GitHub CLI `gh` is available and `--dry-run` is **not** set:
+  - Creates a PR (use `--draft` for draft PRs). Otherwise, prints the compare URL.
+
+Example:
+    mrtask pr 2025-09-08T14-03-12Z-feature_login-ui --base main --push --dry-run
+    # Prints a PR draft and pushes branch; does not create a PR resource.
+
+---
+
+## 🔄 Example Flow
+    mrtask add feature/login-ui login-ui -d "Implement login form" packages/app
+    # (commit your changes on that branch)
+    mrtask pr <task-id> --push --dry-run     # preview
+    mrtask pr <task-id> --push --draft --open --no-dry-run   # create a Draft PR via gh and open it
 
 ---
 

@@ -3,18 +3,82 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import * as fss from "node:fs";
 import { Command } from "commander";
-import fg from "fast-glob";
 import {
-  MR_DIRNAME, ensureDir, pathExists, nowId, slugify, writeYamlAtomic, readYaml,
-  git, gitRoot, ensureOnMainOrForce, branchExists, createBranchFromMain,
-  worktreeAdd, worktreeRemove, sparseInit, sparseSet, unlinkIfSymlink, isBrokenSymlink
+  MR_DIRNAME, ensureDir, nowId, slugify, writeYamlAtomic, readYaml,
+  ensureOnMainOrForce, branchExists, createBranchFromMain,
+  worktreeAdd, worktreeRemove, sparseInit, sparseSet, isBrokenSymlink
 } from "./utils.js";
 import { findRepoRoot, loadPNPMWorkspaces, loadFallbackWorkspaces } from "./workspaces.js";
 import { listTaskFilesUnder, loadTaskFromFile, findTaskById } from "./tasks.js";
-import type { Task, TaskStatus } from "./types.js";
+import type { Task } from "./types.js";
+// ★ 追加
+import { buildPRSpec } from "./builder.js";
+import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR } from "./providers.js";
 
 const program = new Command();
 program.name("mrtask").description("Mono-repo task manager on top of git worktree");
+
+program
+  .command("pr")
+  .description("Generate a pull request from mrtask YAML and git diff")
+  .argument("<id>", "task id (prefix ok)")
+  .option("--base <branch>", "base branch (default: main)", "main")
+  .option("--remote <name>", "git remote (default: origin)", "origin")
+  .option("--push", "push branch to remote if not yet upstream")
+  .option("--draft", "create Draft PR when using GitHub gh CLI")
+  .option("--open", "open compare/PR URL in browser")
+  .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
+  .action(async (id, opts) => {
+    try {
+      const root = await findRepoRoot();
+      let pkgs = await loadPNPMWorkspaces(root);
+      if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+      // ルートも探索
+      pkgs = [root, ...pkgs];
+
+      const t = await findTaskById(pkgs, id);
+      if (!t) throw new Error(`Task not found: ${id}`);
+
+      // PR 下書きを構築
+      const spec = buildPRSpec(t, opts.base, root);
+
+      // リモート情報と compare URL
+      const remoteUrl = getRemoteUrl(opts.remote, root);
+      const compareUrl = buildCompareUrl(remoteUrl, spec.base, spec.head);
+
+      // --push が指定なら upstream 設定まで行う
+      if (opts.push) {
+        if (!remoteUrl) throw new Error(`Remote not found: ${opts.remote}`);
+        ensurePushed(opts.remote, t.branch, root);
+      }
+
+      // dry-run: 標準出力＆ファイル保存して終了
+      if (opts.dryRun) {
+        const outText = planPR(spec, compareUrl);
+        console.log(outText);
+        // ファイルにも書き出す
+        const outDir = path.join(root, MR_DIRNAME, "out");
+        await ensureDir(outDir);
+        await writeYamlAtomic(path.join(outDir, `${t.id}.pr.md`), outText);
+        if (opts.open && compareUrl) openInBrowser(compareUrl);
+        return;
+      }
+
+      // 実PR: gh が使えれば作成、なければ compare URL を出力
+      let createdUrl = compareUrl ?? null;
+      try {
+        createdUrl = createPRWithGh(spec, { draft: !!opts.draft, base: opts.base, cwd: root }) || compareUrl;
+      } catch {
+        // gh が無い/失敗 → compare URL でフォールバック
+        console.log("gh CLI not available or failed; showing compare URL instead.");
+      }
+      console.log(`PR: ${createdUrl ?? "(no URL available)"}`);
+      if (opts.open && createdUrl) openInBrowser(createdUrl);
+    } catch (e: any) {
+      console.error(`✖ pr failed: ${e.message ?? e}`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("add")
@@ -281,3 +345,4 @@ program.parseAsync(process.argv).catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
