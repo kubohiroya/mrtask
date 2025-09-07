@@ -1,0 +1,26 @@
+package.json
+{
+  "name": "mrtask",
+  "version": "0.1.0",
+  "author": "hiroya@cuc.ac.jp",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "mrtask": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts --help",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "fast-glob": "^3.3.2",
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}
