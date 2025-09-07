@@ -124,6 +124,7 @@ program
       const root = await findRepoRoot();
       let pkgs = await loadPNPMWorkspaces(root);
       if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+      pkgs = [root, ...pkgs];
 
       const found: string[] = (await Promise.all(pkgs.map(d => listTaskFilesUnder(d)))).flat();
       const seen = new Map<string, Task & { filePath: string }>();
@@ -180,17 +181,15 @@ async function moveTaskAndRemoveWorktree(id: string, target: "done" | "cancel") 
   const root = await findRepoRoot();
   let pkgs = await loadPNPMWorkspaces(root);
   if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+  pkgs = [root, ...pkgs];
   const t = await findTaskById(pkgs, id);
   if (!t) throw new Error(`Task not found: ${id}`);
-  const taskDir = path.dirname(t.filePath);
-  const isPrimary = taskDir.endsWith(`/${MR_DIRNAME}`) || taskDir.endsWith(`\\${MR_DIRNAME}`);
-  const primaryDir = isPrimary ? path.dirname(taskDir) : path.resolve(root, t.primaryDir);
-  const targetDir = path.join(primaryDir, MR_DIRNAME, target);
-  await ensureDir(targetDir);
-  const targetPath = path.join(targetDir, path.basename(t.filePath));
+  const historyBase = path.join(root, MR_DIRNAME, target);
+  await ensureDir(historyBase);
+  const targetPath = path.join(historyBase, path.basename(t.filePath));
   await fs.rename(t.filePath, targetPath);
-  // ブランチの worktree を primaryDir から削除
-  worktreeRemove(primaryDir);
+  const primaryDirAbs = path.resolve(root, t.primaryDir);
+  worktreeRemove(primaryDirAbs);
   console.log(`✔ Moved to ${target}: ${path.relative(root, targetPath)}`);
 }
 

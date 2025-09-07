@@ -1,8 +1,7 @@
-package.json
 {
   "name": "mrtask",
   "version": "0.1.0",
-  "author": "hiroya@cuc.ac.jp",
+  "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
   "type": "module",
   "bin": {
@@ -11,16 +10,21 @@ package.json
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts --help",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run --reporter=dot"
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "fast-glob": "^3.3.2",
-    "yaml": "^2.5.0"
+    "fast-glob": "^3.3.3",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@types/node": "^20.12.12",
-    "tsx": "^4.19.0",
-    "typescript": "^5.5.4"
-  }
+    "@types/node": "^20.19.13",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^2.0.5"
+  },
+    "keywords":["node", "pnpm", "monorepo", "git"],
+    "license": "MIT",
+    "homepage": "https://github.com/kubohiroya/mrtask"
 }

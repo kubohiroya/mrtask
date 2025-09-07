@@ -3,7 +3,7 @@ import * as fss from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import YAML from "yaml";
-import type { Task, TaskStatus } from "./types.js";
+import type { TaskStatus } from "./types.js";
 
 export const MR_DIRNAME = ".mrtask";
 
@@ -16,7 +16,7 @@ export async function pathExists(p: string) {
 }
 
 export function nowId(branch: string, slug: string) {
-  const iso = new Date().toISOString();               // 2025-09-08T14:03:12.345Z
+  const iso = new Date().toISOString();               // e.g. 2025-09-08T14:03:12.345Z
   const safe = iso.replace(/:/g, "-");                 // 2025-09-08T14-03-12.345Z
   const b = branch.replace(/[\/\\]/g, "_");
   return `${safe}-${b}-${slug}`;
@@ -41,8 +41,19 @@ export async function realpathSafe(p: string) {
   try { return await fs.realpath(p); } catch { return p; }
 }
 
+// ---------- Git helpers ----------
+
 export function git(args: string[], opts?: { cwd?: string }) {
   return execFileSync("git", args, { stdio: "pipe", encoding: "utf8", cwd: opts?.cwd }).trim();
+}
+
+export function refExists(ref: string, cwd?: string): boolean {
+  try {
+    git(["rev-parse", "--verify", ref], { cwd });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getCurrentBranch(cwd?: string) {
@@ -67,8 +78,17 @@ export function branchExists(name: string) {
   return listBranches().includes(name);
 }
 
+// Create a new branch using best-effort base:
+//   origin/main -> main -> current branch (HEAD)
 export function createBranchFromMain(name: string, mainName = "main") {
-  git(["branch", name, `origin/${mainName}`]);
+  let base = `origin/${mainName}`;
+  if (!refExists(base)) {
+    base = mainName;
+  }
+  if (!refExists(base)) {
+    base = getCurrentBranch();
+  }
+  git(["branch", name, base]);
 }
 
 export function worktreeAdd(dir: string, branch: string) {
@@ -76,7 +96,6 @@ export function worktreeAdd(dir: string, branch: string) {
 }
 
 export function worktreeRemove(dir: string) {
-  // --force は汚れていても強制削除。判断は上位で
   git(["worktree", "remove", dir, "--force"]);
 }
 
