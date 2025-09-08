@@ -43,7 +43,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
       "y\n",
     );
 
-    expect(out).toContain("This branch does not exist");
+    expect(out).toContain('The branch "feature/csv-accept" does not exist');
     expect(out).toContain("Created task");
 
     // YAML should exist under the newly created worktree dir

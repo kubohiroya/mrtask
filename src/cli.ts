@@ -193,7 +193,7 @@ program
         // For CSV-driven adds, ask before creating the branch to avoid surprises.
         if (opts.fromCsv) {
           const rl = getRl();
-          const ans = (await rl.question("This branch does not exist. Create it now? (y/N) ")).trim().toLowerCase();
+          const ans = (await rl.question(`The branch "${branch}" does not exist. Create it now? (y/N) `)).trim().toLowerCase();
           if (ans === "y") {
             if (!opts.dryRun) createBranchFromMain(branch, "main");
           } else {
