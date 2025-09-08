@@ -62,4 +62,21 @@ describe("mrtask pr stage-2 flow", () => {
     const ls = execSync("git ls-remote --heads origin", { cwd: repoDir, encoding: "utf8" });
     expect(ls).toMatch(/refs\/heads\/feature\/e2e/);
   });
+
+  it("accepts task file path as second argument", async () => {
+    const files = await fg(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
+    const taskFilePath = path.relative(repoDir, files[0]);
+    const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
+    
+    // Test using task file path instead of ID
+    const out = runNodeBin(cli(), ["pr", id, taskFilePath, "--base", "main", "--dry-run"], repoDir);
+    expect(out).toContain("PR DRAFT");
+    expect(out).toContain("# [app] e2e task"); // title scope should be the same
+    expect(out).toContain("## Summary");
+    expect(out).toMatch(/Compare:\s/);
+    
+    // file output should still work
+    const prFile = path.join(repoDir, ".mrtask", "out", `${id}.pr.md`);
+    expect(fss.existsSync(prFile)).toBe(true);
+  });
 });
