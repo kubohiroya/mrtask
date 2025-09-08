@@ -19,7 +19,9 @@ with YAML metadata that makes tasks searchable, sharable, and automatable.
 
 ## 🔑 Features
 
-- ➕ `mrtask add` — create a task YAML and a git worktree
+- 🏠 `mrtask init` — initialize MRTASK_HOME and workTrees base with a setup guide
+- ➕ `mrtask add` — create a task YAML and a git worktree (prints YAML; supports --dry-run/--silent)
+<!-- add-home was experimental and has been removed to keep UX simple. -->
 - 📋 `mrtask list/show` — query tasks across workspaces
 - ✅ `mrtask done/cancel/remove` — move or delete task records, remove worktrees
 - 🩺 `mrtask doctor` — basic integrity checks
@@ -64,7 +66,7 @@ On success (including `--dry-run`), the YAML content of the task is printed to s
 - 📝 `-d <text>` — task description (inline).  
 - 📄 `-f <file.yml>` — use an existing YAML file as the task definition.  
 - 📊 `-t <file.csv:line>` — create task from CSV line.  
-  - Recognized CSV headers: `title`, `description`, `branch`, `dir`/`primaryDir`/`dir1`, `dirs`, `slug`（不足は対話で補完）。  
+  - Recognized CSV headers: `title`, `description`, `branch`, `dir`/`primaryDir`/`dir1`, `dirs`, `slug`. Missing fields are prompted interactively.  
   - With `-t`, positional args are optional; values can come from CSV and prompts.  
 - 🌲 `--sparse` — enable sparse-checkout for the listed directories.  
 - 🧪 `--dry-run` — preview only; does not create branch/worktree or write files, but prints the YAML that would be written.  
@@ -191,6 +193,21 @@ Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current g
     
     # Using direct file path (new approach)
     mrtask pr any-id packages/app/.mrtask/2025-09-08T14-03-12Z-feature_login-ui.yml --push --dry-run
+
+---
+
+### `mrtask init` 🏠
+
+Optionally initialize MRTASK_HOME. Most users don’t need this — run it only if you want to customize the default home path used by future integrations.
+
+    mrtask init [path]
+
+If no path is given, a sensible OS-specific default is used:
+- Windows: `%APPDATA%/mrtask`
+- macOS: `~/Library/Application Support/mrtask`
+- Linux: `$XDG_CONFIG_HOME/mrtask` or `~/.config/mrtask`
+
+The command prints a short guide to export `MRTASK_HOME` for your shell.
 
 ---
 

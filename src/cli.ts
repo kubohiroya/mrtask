@@ -17,6 +17,7 @@ import type { Task } from "./types.js";
 // ★ 追加
 import { buildPRSpec } from "./builder.js";
 import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR } from "./providers.js";
+import { detectProjectName, ensureHome, printInitGuide } from "./home.js";
 
 // Resolve package version without JSON import attributes (Node 18 compatible)
 let pkgVersion = "0.0.0";
@@ -100,6 +101,21 @@ program
       if (opts.open && createdUrl) openInBrowser(createdUrl);
     } catch (e: any) {
       console.error(`✖ pr failed: ${e.message ?? e}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("init")
+  .description("Initialize mrtask home directory and workTrees base")
+  .argument("[path]", "custom MRTASK_HOME path")
+  .action(async (p?: string) => {
+    try {
+      const name = detectProjectName();
+      const { home, wtBase } = ensureHome(name, p);
+      printInitGuide(home, wtBase);
+    } catch (e: any) {
+      console.error(`✖ init failed: ${e.message ?? e}`);
       process.exitCode = 1;
     }
   });

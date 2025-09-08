@@ -28,11 +28,12 @@ export function distCliPath() {
   return path.resolve(projectRoot(), "dist", "cli.js");
 }
 
-export function runNodeBin(binJsPath: string, args: string[], cwd: string) {
+export function runNodeBin(binJsPath: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
   return execFileSync(process.execPath, [binJsPath, ...args], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    env: env ? { ...process.env, ...env } : process.env,
   });
 }
 
@@ -40,13 +41,15 @@ export function runNodeBinWithInput(
   binJsPath: string,
   args: string[],
   cwd: string,
-  inputText: string
+  inputText: string,
+  env?: NodeJS.ProcessEnv
 ) {
   return execFileSync(process.execPath, [binJsPath, ...args], {
     cwd,
     encoding: "utf8",
     input: inputText,
     stdio: ["pipe", "pipe", "pipe"],
+    env: env ? { ...process.env, ...env } : process.env,
   });
 }
 
@@ -54,7 +57,8 @@ export function runNodeBinWithResult(
   binJsPath: string,
   args: string[],
   cwd: string,
-  inputText?: string
+  inputText?: string,
+  env?: NodeJS.ProcessEnv
 ) {
   try {
     const stdout = execFileSync(process.execPath, [binJsPath, ...args], {
@@ -62,6 +66,7 @@ export function runNodeBinWithResult(
       encoding: "utf8",
       input: inputText,
       stdio: ["pipe", "pipe", "pipe"],
+      env: env ? { ...process.env, ...env } : process.env,
     });
     return { status: 0, stdout, stderr: "" };
   } catch (e: any) {
