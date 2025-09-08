@@ -18,6 +18,7 @@ import type { Task } from "./types.js";
 // ★ 追加
 import { buildPRSpec } from "./builder.js";
 import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR } from "./providers.js";
+import { git } from "./utils.js";
 import { detectProjectName, ensureHome, printInitGuide } from "./home.js";
 
 // Resolve package version without JSON import attributes (Node 18 compatible)
@@ -437,7 +438,7 @@ program
   .command("show")
   .description("Show a task by id or file path")
   .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
-  .action(async (input) => {
+  .action(async (input, optsCmd) => {
     try {
       const root = await findRepoRoot();
       const asPath = path.resolve(root, input);
@@ -473,22 +474,61 @@ async function moveTaskAndRemoveWorktree(idOrPath: string, target: "done" | "can
   await fs.rename(t.filePath, targetPath);
   // Prefer removing dedicated worktree under .mrtask/wt/<id> if present; fallback to legacy behavior
   const wtRoot = path.join(root, MR_DIRNAME, "wt", t.id);
+  let removedPath: string | null = null;
   if (fss.existsSync(wtRoot)) {
     worktreeRemove(wtRoot);
+    removedPath = wtRoot;
   } else {
     const primaryDirAbs = path.resolve(root, t.primaryDir);
-    worktreeRemove(primaryDirAbs);
+    try {
+      worktreeRemove(primaryDirAbs);
+      removedPath = primaryDirAbs;
+    } catch {
+      removedPath = null;
+    }
   }
   console.log(`✔ Moved to ${target}: ${path.relative(root, targetPath)}`);
+  console.log(`  Worktree removed: ${removedPath ? path.relative(root, removedPath) : "(none)"}`);
+  console.log(`  Branch kept: ${t.branch}`);
 }
 
 program
   .command("done")
   .description("Mark task done (moves YAML to .mrtask/done/ and removes worktree)")
   .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
-  .action(async (input) => {
+  .option("--keep-branch", "do not delete the branch (default: delete safely)")
+  .option("--force-delete-branch", "force delete local branch even if not merged (-D)")
+  .option("--delete-remote", "also delete remote branch if upstream exists")
+  .option("--remote <name>", "remote name for deletion (default: origin)", "origin")
+  .action(async (input, optsCmd) => {
     try {
       await moveTaskAndRemoveWorktree(input, "done");
+      // branch deletion policy for done: safe delete by default
+      const root = await findRepoRoot();
+      const asPath = path.resolve(root, input);
+      let t: any;
+      if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+      else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        t = await findTaskById([root, ...pkgs], input);
+      }
+      const optsLocal: any = optsCmd ?? {};
+      if (t && !optsLocal.keepBranch) {
+        try {
+          const force = !!optsLocal.forceDeleteBranch;
+          git(["branch", force ? "-D" : "-d", t.branch], { cwd: root });
+          console.log(`  Branch deleted (local): ${t.branch}${force ? " (forced)" : ""}`);
+        } catch (e: any) {
+          console.log(`  Branch kept (not merged?): ${t?.branch ?? "(unknown)"}`);
+        }
+        if (optsLocal.deleteRemote) {
+          const remote = optsLocal.remote ?? "origin";
+          try { git(["push", remote, `:refs/heads/${t.branch}`], { cwd: root }); console.log(`  Branch deleted (remote): ${remote}/${t.branch}`); } catch {}
+        }
+      } else {
+        if (t) console.log(`  Branch kept: ${t.branch}`);
+      }
     } catch (e: any) {
       console.error(`✖ done failed: ${e.message ?? e}`);
       process.exitCode = 1;
@@ -499,9 +539,29 @@ program
   .command("cancel")
   .description("Cancel task (moves YAML to .mrtask/cancel/ and removes worktree)")
   .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
-  .action(async (input) => {
+  .option("--keep-branch", "do not delete the branch (default: force delete)")
+  .option("--delete-remote", "also delete remote branch if upstream exists")
+  .option("--remote <name>", "remote name for deletion (default: origin)", "origin")
+  .action(async (input, optsCmd) => {
     try {
       await moveTaskAndRemoveWorktree(input, "cancel");
+      const root = await findRepoRoot();
+      const asPath = path.resolve(root, input);
+      let t: any;
+      if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+      else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        t = await findTaskById([root, ...pkgs], input);
+      }
+      const optsCancel: any = optsCmd ?? {};
+      if (t && !optsCancel.keepBranch) {
+        try { git(["branch", "-D", t.branch], { cwd: root }); console.log(`  Branch deleted (local, forced): ${t.branch}`); } catch {}
+        if (optsCancel.deleteRemote) {
+          const remote = optsCancel.remote ?? "origin";
+          try { git(["push", remote, `:refs/heads/${t.branch}`], { cwd: root }); console.log(`  Branch deleted (remote): ${remote}/${t.branch}`); } catch {}
+        }
+      } else { if (t) console.log(`  Branch kept: ${t.branch}`); }
     } catch (e: any) {
       console.error(`✖ cancel failed: ${e.message ?? e}`);
       process.exitCode = 1;
@@ -512,7 +572,10 @@ program
   .command("remove")
   .description("Remove task YAML and worktree (no record kept)")
   .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
-  .action(async (input) => {
+  .option("--keep-branch", "do not delete the branch (default: force delete)")
+  .option("--delete-remote", "also delete remote branch if upstream exists")
+  .option("--remote <name>", "remote name for deletion (default: origin)", "origin")
+  .action(async (input, optsCmd) => {
     try {
       const root = await findRepoRoot();
       const asPath = path.resolve(root, input);
@@ -527,9 +590,27 @@ program
       // delete YAML (primary), unlink secondary shims/links
       await fs.rm(t.filePath, { force: true });
       // remove worktree
-      const primaryDir = path.resolve(root, t.primaryDir);
-      worktreeRemove(primaryDir);
+      const wtRoot = path.join(root, MR_DIRNAME, "wt", t.id);
+      let removedPath: string | null = null;
+      if (fss.existsSync(wtRoot)) {
+        worktreeRemove(wtRoot);
+        removedPath = wtRoot;
+      } else {
+        const primaryDir = path.resolve(root, t.primaryDir);
+        try { worktreeRemove(primaryDir); removedPath = primaryDir; } catch { removedPath = null; }
+      }
       console.log(`✔ removed: ${t.id}`);
+      console.log(`  Worktree removed: ${removedPath ? path.relative(root, removedPath) : "(none)"}`);
+      const optsRemove: any = optsCmd ?? {};
+      if (!optsRemove.keepBranch) {
+        try { git(["branch", "-D", t.branch], { cwd: root }); console.log(`  Branch deleted (local, forced): ${t.branch}`); } catch {}
+        if (optsRemove.deleteRemote) {
+          const remote = optsRemove.remote ?? "origin";
+          try { git(["push", remote, `:refs/heads/${t.branch}`], { cwd: root }); console.log(`  Branch deleted (remote): ${remote}/${t.branch}`); } catch {}
+        }
+      } else {
+        console.log(`  Branch kept: ${t.branch}`);
+      }
     } catch (e: any) {
       console.error(`✖ remove failed: ${e.message ?? e}`);
       process.exitCode = 1;
