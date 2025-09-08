@@ -34,22 +34,32 @@ program
   .command("pr")
   .description("Generate a pull request from mrtask YAML and git diff")
   .argument("<id>", "task id (prefix ok)")
+  .argument("[task-file-path]", "direct path to task YAML file (optional)")
   .option("--base <branch>", "base branch (default: main)", "main")
   .option("--remote <name>", "git remote (default: origin)", "origin")
   .option("--push", "push branch to remote if not yet upstream")
   .option("--draft", "create Draft PR when using GitHub gh CLI")
   .option("--open", "open compare/PR URL in browser")
   .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
-  .action(async (id, opts) => {
+  .action(async (id, taskFilePath, opts) => {
     try {
       const root = await findRepoRoot();
-      let pkgs = await loadPNPMWorkspaces(root);
-      if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-      // ルートも探索
-      pkgs = [root, ...pkgs];
+      let t;
 
-      const t = await findTaskById(pkgs, id);
-      if (!t) throw new Error(`Task not found: ${id}`);
+      if (taskFilePath) {
+        // Load task directly from specified file path
+        const resolvedPath = path.resolve(root, taskFilePath);
+        t = await loadTaskFromFile(resolvedPath);
+      } else {
+        // Use existing ID-based search
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        // ルートも探索
+        pkgs = [root, ...pkgs];
+
+        t = await findTaskById(pkgs, id);
+        if (!t) throw new Error(`Task not found: ${id}`);
+      }
 
       // PR 下書きを構築
       const spec = buildPRSpec(t, opts.base, root);
