@@ -27,7 +27,7 @@ with YAML metadata that makes tasks searchable, sharable, and automatable.
 - 🩺 `mrtask doctor` — basic integrity checks
 
 ## ⭐️ Usage Flow (overview)
-
+“CMD nodes = mrtask commands; others = repo/GitHub states”
 ```mermaid
 stateDiagram-v2
     classDef cmd fill:#FFF3B0,stroke:#F2A50C,stroke-width:2px,color:#111
@@ -35,37 +35,65 @@ stateDiagram-v2
     [*] --> CMD_ADD
     CMD_ADD: mrtask add
     class CMD_ADD cmd
-    CMD_ADD --> OPEN: Create Task YAML (mrtask/ID.yml)<br/>Branch created (feature branch)<br/>Worktree created
+
+    CMD_ADD --> OPEN
     state OPEN {
-      [*] --> CREATE_CHANGESET
+        [*] --> CODE_CHANGES
+        CODE_CHANGES: commits / changes
     }
 
     OPEN --> CMD_PR
     CMD_PR: mrtask pr
     class CMD_PR cmd
+
+    OPEN --> CMD_CANCEL
+    OPEN --> CMD_REMOVE
+
+    NOT_ACCEPTED --> OPEN
+    REVIEW --> CMD_CANCEL
+    REVIEW --> CMD_REMOVE
+
     CMD_PR --> REVIEW
     REVIEW --> MERGE_ACCEPTED
-    REVIEW --> CANCEL
-    REVIEW --> REMOVE
     REVIEW --> NOT_ACCEPTED
-    NOT_ACCEPTED --> OPEN
-    MERGE_ACCEPTED --> CMD_DONE
-    CANCEL --> CMD_CANCEL
-    REMOVE --> CMD_REMOVE
 
+    MERGE_ACCEPTED --> CMD_DONE
     CMD_DONE: mrtask done
     class CMD_DONE cmd
-    CMD_DONE --> [*]: Branch and worktree deleted <br/> Move YAML to done folder
-    
+
     CMD_CANCEL: mrtask cancel
     class CMD_CANCEL cmd
-    CMD_CANCEL --> [*]: Branch and worktree deleted <br/> Move YAML to cancel folder
-
     CMD_REMOVE: mrtask remove
     class CMD_REMOVE cmd
-    CMD_REMOVE --> [*]: Branch and worktree deleted <br/> Delete YAML 
 
-```
+    CMD_DONE --> [*]: complete
+    CMD_CANCEL --> [*]: canceled
+    CMD_REMOVE --> [*]: removed
+    
+    note right of CMD_ADD
+        Create task YAML
+        Branch created (feature branch)
+        Worktree created
+    end note
+
+    note right of CMD_DONE
+        YAML → done folder
+        Branch deleted (safe, forced optional)
+        Worktree removed
+    end note
+
+    note right of CMD_CANCEL
+        YAML → cancel folder
+        Branch deleted (forced)
+        Worktree removed
+    end note
+
+    note right of CMD_REMOVE
+        YAML deleted
+        Branch deleted (forced)
+        Worktree removed
+    end note
+ ```
 
 
 ---
