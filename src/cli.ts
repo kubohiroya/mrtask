@@ -137,22 +137,44 @@ program
       }
 
       if (opts.fromCsv) {
+        // Minimal CSV parser that supports quoted fields and commas within quotes
+        const parseCsvLine = (line: string): string[] => {
+          const out: string[] = [];
+          let cur = "";
+          let inQ = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+              if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+              else { inQ = !inQ; }
+            } else if (ch === ',' && !inQ) {
+              out.push(cur);
+              cur = "";
+            } else {
+              cur += ch;
+            }
+          }
+          out.push(cur);
+          return out.map(s => s.trim().replace(/^\uFEFF/, ""));
+        };
+        const stripOuterQuotes = (s: string) => s.replace(/^['\"](.*)['\"]$/s, "$1");
+
         const [csvPath, lineStr] = String(opts.fromCsv).split(":");
         const lineNo = Number(lineStr);
         const raw = await fs.readFile(path.resolve(csvPath), "utf8");
         const rows = raw.split(/\r?\n/);
-        const header = (rows[0] ?? "").split(",").map(s => s.trim());
-        const row = (rows[lineNo - 1] ?? "").split(",");
+        const header = parseCsvLine(rows[0] ?? "");
+        const row = parseCsvLine(rows[lineNo - 1] ?? "");
         const get = (key: string) => {
           const idx = header.findIndex(h => h.toLowerCase() === key.toLowerCase());
-          return idx >= 0 ? (row[idx] ?? "").trim() : "";
+          return idx >= 0 ? stripOuterQuotes((row[idx] ?? "").trim()) : "";
         };
         // Prefer explicit columns; fallback to legacy [title, description]
-        const csvTitle = get("title") || (row[0]?.trim() ?? "");
-        const csvDesc = get("description") || (row[1]?.trim() ?? "");
+        const csvTitle = get("title") || stripOuterQuotes((row[0]?.trim() ?? ""));
+        const csvDesc = get("description") || stripOuterQuotes((row[1]?.trim() ?? ""));
         const csvBranch = get("branch");
         const csvDir = get("dir") || get("primaryDir") || get("dir1");
-        const csvDirs = (get("dirs") || "").split(/[,;\s]+/).filter(Boolean);
+        const csvDirs = (get("dirs") || "").replace(/^\[(.*)\]$/, "$1").split(/[,;\s]+/).filter(Boolean).map(stripOuterQuotes);
         const csvSlug = get("slug");
 
         if (!description && csvDesc) description = csvDesc;
