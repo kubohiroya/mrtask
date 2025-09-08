@@ -55,6 +55,7 @@ After installation, the `mrtask` command will be available in your shell:
 ### `mrtask add` ➕
 
 Create a new task, a corresponding git worktree, and a `.mrtask/<task-id>.yml` metadata file.
+On success (including `--dry-run`), the YAML content of the task is printed to stdout. Use `--silent` to suppress it.
 
     mrtask add <branch-name> <task-name-segment> \
       -d "Task description" <dir1> [dir2...]
@@ -63,11 +64,19 @@ Create a new task, a corresponding git worktree, and a `.mrtask/<task-id>.yml` m
 - 📝 `-d <text>` — task description (inline).  
 - 📄 `-f <file.yml>` — use an existing YAML file as the task definition.  
 - 📊 `-t <file.csv:line>` — create task from CSV line.  
+  - Recognized CSV headers: `title`, `description`, `branch`, `dir`/`primaryDir`, `dirs`, `slug`（不足は対話で補完）。  
+  - With `-t`, positional args are optional; values can come from CSV and prompts.  
 - 🌲 `--sparse` — enable sparse-checkout for the listed directories.  
+- 🧪 `--dry-run` — preview only; does not create branch/worktree or write files, but prints the YAML that would be written.  
+- 🤫 `--silent` — suppress output on success (errors still printed).  
 
-**Example**
+**Examples**
     mrtask add feature/login-ui login-ui \
       -d "Implement login form with validation" packages/app
+    # CSV-only (no positional args)
+    mrtask add -t TASKS.csv:2
+    # Preview only
+    mrtask add feature/login-ui login-ui --dry-run packages/app
 
 ---
 

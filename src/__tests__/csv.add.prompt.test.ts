@@ -22,7 +22,11 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
     const repo = await makeTempRepo();
 
     // simple CSV with two lines; we will reference line 2
-    await fs.writeFile(path.join(repo, "TASKS.csv"), "Title,Description\nCSV Task,From CSV\n", "utf8");
+    await fs.writeFile(
+      path.join(repo, "TASKS.csv"),
+      "title,description,branch,dir\nCSV Task,From CSV,feature/csv-accept,packages/csvapp\n",
+      "utf8",
+    );
 
     const out = runNodeBinWithInput(
       cli(),
@@ -35,6 +39,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
         "packages/csvapp",
       ],
       repo,
+      // confirm branch creation only
       "y\n",
     );
 
@@ -49,7 +54,11 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
 
   it("aborts without creating when input is empty (default N)", async () => {
     const repo = await makeTempRepo();
-    await fs.writeFile(path.join(repo, "TASKS.csv"), "Title,Description\nCSV Task,From CSV\n", "utf8");
+    await fs.writeFile(
+      path.join(repo, "TASKS.csv"),
+      "title,description,branch,dir\nCSV Task,From CSV,feature/csv-decline,packages/csvapp2\n",
+      "utf8",
+    );
 
     let err: any | null = null;
     try {
@@ -57,11 +66,8 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
         cli(),
         [
           "add",
-          "feature/csv-decline",
-          "csv-decline",
           "-t",
           "TASKS.csv:2",
-          "packages/csvapp2",
         ],
         repo,
         "\n", // default: decline
@@ -82,4 +88,3 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
     expect(fss.existsSync(path.join(repo, "packages/csvapp2"))).toBe(false);
   });
 });
-

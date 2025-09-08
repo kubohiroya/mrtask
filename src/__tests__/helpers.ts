@@ -50,6 +50,25 @@ export function runNodeBinWithInput(
   });
 }
 
+export function runNodeBinWithResult(
+  binJsPath: string,
+  args: string[],
+  cwd: string,
+  inputText?: string
+) {
+  try {
+    const stdout = execFileSync(process.execPath, [binJsPath, ...args], {
+      cwd,
+      encoding: "utf8",
+      input: inputText,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { status: 0, stdout, stderr: "" };
+  } catch (e: any) {
+    return { status: e?.status ?? 1, stdout: String(e?.stdout ?? ""), stderr: String(e?.stderr ?? "") };
+  }
+}
+
 export function runGit(args: string[], cwd: string) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }

@@ -106,20 +106,85 @@ program
 
 program
   .command("add")
-  .description("Create task YAML and git worktree")
-  .argument("<branch>", "branch name to use")
-  .argument("<task-name-segment>", "short slug for task title")
+  .description("Create task YAML and git worktree; prints YAML to stdout unless --silent. Use --dry-run to preview without changes.")
+  // Allow CSV-only mode by making args optional; we will validate later.
+  .argument("[branch]", "branch name to use")
+  .argument("[task-name-segment]", "short slug for task title")
   .option("-d, --description <text>", "task description")
   .option("-f, --file <yamlFile>", "use existing YAML as definition")
   .option("-t, --from-csv <csv:line>", "create from CSV (file.csv:12)")
   .option("--sparse", "enable sparse-checkout for provided dirs")
+  .option("--dry-run", "print YAML without modifying git or filesystem")
+  .option("--silent", "suppress output on success (errors still shown)")
   .option("--force", "allow running off main branch")
-  .argument("<dir1>", "primary work dir (package dir)")
+  .argument("[dir1]", "primary work dir (package dir)")
   .argument("[dirN...]", "secondary work dirs")
-  .action(async (branch: string, taskSeg: string, dir1: string, dirN: string[] = [], opts: any) => {
+  .action(async (branchArg: string | undefined, taskSegArg: string | undefined, dir1Arg: string | undefined, dirNArg: string[] = [], opts: any) => {
     try {
       ensureOnMainOrForce(!!opts.force);
       const root = await findRepoRoot();
+
+      // Resolve inputs possibly coming from CSV
+      let branch = branchArg;
+      let taskSeg = taskSegArg;
+      let dir1 = dir1Arg;
+      let dirN = dirNArg;
+      let description = opts.description as string | undefined;
+
+      if (opts.file) {
+        const y = await readYaml<any>(path.resolve(opts.file));
+        description = y?.description ?? description;
+      }
+
+      if (opts.fromCsv) {
+        const [csvPath, lineStr] = String(opts.fromCsv).split(":");
+        const lineNo = Number(lineStr);
+        const raw = await fs.readFile(path.resolve(csvPath), "utf8");
+        const rows = raw.split(/\r?\n/);
+        const header = (rows[0] ?? "").split(",").map(s => s.trim());
+        const row = (rows[lineNo - 1] ?? "").split(",");
+        const get = (key: string) => {
+          const idx = header.findIndex(h => h.toLowerCase() === key.toLowerCase());
+          return idx >= 0 ? (row[idx] ?? "").trim() : "";
+        };
+        // Prefer explicit columns; fallback to legacy [title, description]
+        const csvTitle = get("title") || (row[0]?.trim() ?? "");
+        const csvDesc = get("description") || (row[1]?.trim() ?? "");
+        const csvBranch = get("branch");
+        const csvDir = get("dir") || get("primaryDir");
+        const csvDirs = (get("dirs") || "").split(/[,;\s]+/).filter(Boolean);
+        const csvSlug = get("slug");
+
+        if (!description && csvDesc) description = csvDesc;
+        if (!taskSeg && (csvSlug || csvTitle)) taskSeg = (csvSlug || csvTitle).toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
+        if (!branch && csvBranch) branch = csvBranch;
+        if (!dir1 && csvDir) dir1 = csvDir;
+        if (dirN.length === 0 && csvDirs.length > 0) dirN = csvDirs;
+      }
+
+      // Interactive fallback for any still-missing required inputs when CSV mode used
+      // Single readline instance for the whole interactive flow to play nicely with piped stdin in tests/CI
+      let rlRef: any = null;
+      const getRl = () => (rlRef ??= readline.createInterface({ input, output }));
+
+      if (opts.fromCsv) {
+        const rl = getRl();
+        if (!branch) {
+          branch = (await rl.question("Enter branch name: ")).trim();
+        }
+        if (!taskSeg) {
+          taskSeg = (await rl.question("Enter task slug/title: ")).trim();
+        }
+        if (!dir1) {
+          dir1 = (await rl.question("Enter primary work dir: ")).trim();
+        }
+      }
+
+      // Validate
+      if (!branch) throw new Error("missing required argument 'branch'");
+      if (!taskSeg) throw new Error("missing required argument 'task-name-segment'");
+      if (!dir1) throw new Error("missing required argument 'dir1'");
+
       const primary = path.resolve(root, dir1);
       const dirs = [primary, ...dirN.map(d => path.resolve(root, d))];
 
@@ -127,26 +192,28 @@ program
       if (!branchExists(branch)) {
         // For CSV-driven adds, ask before creating the branch to avoid surprises.
         if (opts.fromCsv) {
-          const rl = readline.createInterface({ input, output });
+          const rl = getRl();
           const ans = (await rl.question("This branch does not exist. Create it now? (y/N) ")).trim().toLowerCase();
-          await rl.close();
           if (ans === "y") {
-            createBranchFromMain(branch, "main");
+            if (!opts.dryRun) createBranchFromMain(branch, "main");
           } else {
             console.error("Aborted. Branch not created.");
+            try { await rlRef?.close?.(); } catch {}
             process.exitCode = 1;
             return;
           }
         } else {
           // Non-CSV mode keeps existing behavior (auto-create from main/base).
-          createBranchFromMain(branch, "main");
+          if (!opts.dryRun) createBranchFromMain(branch, "main");
         }
       }
 
-      // git worktree add on primary
-      worktreeAdd(primary, branch);
+      // git worktree add on primary (skip in dry-run)
+      if (!opts.dryRun) {
+        worktreeAdd(primary, branch);
+      }
       const mrDir = path.join(primary, MR_DIRNAME);
-      await ensureDir(mrDir);
+      if (!opts.dryRun) await ensureDir(mrDir);
 
       // Task ID & YAML
       const title = taskSeg.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
@@ -154,20 +221,6 @@ program
       const fileName = `${id}.yml`;
       const filePath = path.join(mrDir, fileName);
 
-      let description = opts.description as string | undefined;
-      if (opts.file) {
-        const y = await readYaml<any>(path.resolve(opts.file));
-        description = y?.description ?? description;
-      } else if (opts.fromCsv) {
-        const [csvPath, lineStr] = String(opts.fromCsv).split(":");
-        const lineNo = Number(lineStr);
-        const raw = await fs.readFile(path.resolve(csvPath), "utf8");
-        const rows = raw.split(/\r?\n/);
-        const row = rows[lineNo - 1] ?? "";
-        // 超ざっくり: 1列目=title, 2列目=description
-        const [titleCsv, descCsv] = row.split(",");
-        if (!description && descCsv) description = descCsv.trim();
-      }
 
       const task: Task = {
         id,
@@ -184,36 +237,56 @@ program
         assignees: [],
       };
 
-      await writeYamlAtomic(filePath, task);
+      if (!opts.dryRun) {
+        await writeYamlAtomic(filePath, task);
 
-      // symlinks on secondary dirs
-      for (const d of dirs.slice(1)) {
-        const linkDir = path.join(d, MR_DIRNAME);
-        await ensureDir(linkDir);
-        const rel = path.relative(linkDir, filePath);
-        try { await fs.symlink(rel, path.join(linkDir, fileName)); }
-        catch (e) {
-          // Windows等で失敗したら薄いYAMLを置く（参照先のみ）。
-          const shim = { $ref: path.relative(d, filePath) };
-          await writeYamlAtomic(path.join(linkDir, fileName), shim);
+        // symlinks on secondary dirs
+        for (const d of dirs.slice(1)) {
+          const linkDir = path.join(d, MR_DIRNAME);
+          await ensureDir(linkDir);
+          const rel = path.relative(linkDir, filePath);
+          try { await fs.symlink(rel, path.join(linkDir, fileName)); }
+          catch (e) {
+            // Windows等で失敗したら薄いYAMLを置く（参照先のみ）。
+            const shim = { $ref: path.relative(d, filePath) };
+            await writeYamlAtomic(path.join(linkDir, fileName), shim);
+          }
         }
       }
 
       // sparse-checkout
-      if (opts.sparse) {
+      if (opts.sparse && !opts.dryRun) {
         sparseInit(primary);
         const rels = dirs.map(d => path.relative(primary, d)).map(p => p.replace(/^(\.\/)?/, ""));
         // ルートから見たパスの方が安全だが、シンプルに
         sparseSet(primary, rels);
       }
 
-      console.log(`✔ Created task ${id}`);
-      console.log(`  YAML: ${path.relative(root, filePath)}`);
-      console.log(`  Worktree: ${path.relative(root, primary)} on branch ${branch}`);
+      // Output section
+      if (!opts.silent) {
+        console.log(`✔ Created task ${id}`);
+        if (!opts.dryRun) {
+          console.log(`  YAML: ${path.relative(root, filePath)}`);
+          console.log(`  Worktree: ${path.relative(root, primary)} on branch ${branch}`);
+        } else {
+          console.log(`  (dry-run) No files written.`);
+        }
+        // Print YAML content (either from object or file)
+        // We use the in-memory object to avoid I/O in dry-run and to keep consistent formatting
+        try {
+          const YAMLMod = await import("yaml");
+          const yamlText = YAMLMod.default.stringify(task);
+          process.stdout.write(yamlText.endsWith("\n") ? yamlText : yamlText + "\n");
+        } catch {}
+      }
+      try { await rlRef?.close?.(); } catch {}
     } catch (e: any) {
       console.error(`✖ add failed: ${e.message ?? e}`);
       process.exitCode = 1;
     }
+  }).hook("postAction", async () => {
+    // Ensure any lingering readline is closed (best-effort)
+    try { (output as any).write(""); } catch {}
   });
 
 program

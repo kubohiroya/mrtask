@@ -1,6 +1,6 @@
 {
   "name": "mrtask",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
   "description": "Mono-repo task manager on top of git worktree",
