@@ -164,8 +164,13 @@ Show or edit configuration (e.g. CSV column mapping, default branch).
 ### `mrtask pr` 🔀
 Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current git diff.
 
-    mrtask pr <task-id> [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]
+    mrtask pr <task-id> [task-file-path] [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]
 
+**Arguments**
+- `<task-id>` — task id (prefix ok)
+- `[task-file-path]` — direct path to task YAML file (optional alternative to searching by ID)
+
+**Options**
 - `--dry-run` (default): Print PR **draft** (Title/Body) and a **compare URL** if available.
   - Saves the draft to `.mrtask/out/<id>.pr.md`
   - With `--open`, opens the compare URL in a browser.
@@ -173,16 +178,20 @@ Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current g
 - If GitHub CLI `gh` is available and `--dry-run` is **not** set:
   - Creates a PR (use `--draft` for draft PRs). Otherwise, prints the compare URL.
 
-Example:
+**Examples**
+    # Using task ID (existing approach)
     mrtask pr 2025-09-08T14-03-12Z-feature_login-ui --base main --push --dry-run
-    # Prints a PR draft and pushes branch; does not create a PR resource.
+    
+    # Using direct file path (new approach)
+    mrtask pr any-id packages/app/.mrtask/2025-09-08T14-03-12Z-feature_login-ui.yml --push --dry-run
 
 ---
 
 ## 🔄 Example Flow
     mrtask add feature/login-ui login-ui -d "Implement login form" packages/app
     # (commit your changes on that branch)
-    mrtask pr <task-id> --push --dry-run     # preview
+    mrtask pr <task-id> --push --dry-run     # preview using task ID
+    mrtask pr <task-id> packages/app/.mrtask/<task-id>.yml --push --dry-run  # preview using file path
     mrtask pr <task-id> --push --draft --open --no-dry-run   # create a Draft PR via gh and open it
 
 ---
