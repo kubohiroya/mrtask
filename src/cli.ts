@@ -2,6 +2,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import * as fss from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import {
   MR_DIRNAME, ensureDir, nowId, slugify, writeYamlAtomic, readYaml,
@@ -15,8 +16,19 @@ import type { Task } from "./types.js";
 import { buildPRSpec } from "./builder.js";
 import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR } from "./providers.js";
 
+// Resolve package version without JSON import attributes (Node 18 compatible)
+let pkgVersion = "0.0.0";
+try {
+  const pkgPath = fileURLToPath(new URL("../package.json", import.meta.url));
+  const raw = fss.readFileSync(pkgPath, "utf8");
+  pkgVersion = JSON.parse(raw)?.version ?? pkgVersion;
+} catch {}
+
 const program = new Command();
-program.name("mrtask").description("Mono-repo task manager on top of git worktree");
+program
+  .name("mrtask")
+  .description("Mono-repo task manager on top of git worktree")
+  .version(String(pkgVersion));
 
 program
   .command("pr")
@@ -345,4 +357,3 @@ program.parseAsync(process.argv).catch((e) => {
   console.error(e);
   process.exit(1);
 });
-

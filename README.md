@@ -30,20 +30,18 @@ with YAML metadata that makes tasks searchable, sharable, and automatable.
 
 ## 📦 Installation
 
-`mrtask` will be distributed via npm once released.
+Install from npm:
 
-### Using npm
     npm install -g mrtask
-
-### Using pnpm
+    # or
     pnpm add -g mrtask
-
-### Using yarn
+    # or
     yarn global add mrtask
 
 After installation, the `mrtask` command will be available in your shell:
 
     mrtask --help
+    mrtask --version
 
 ### Requirements
 - 🐙 Git ≥ 2.20 (for `git worktree` support)  
@@ -198,4 +196,5 @@ Example:
 
 ## 📜 License
 
+MIT — see `LICENSE` for full text.
 MIT

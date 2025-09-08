@@ -3,12 +3,15 @@
   "version": "0.2.0",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
+  "description": "Mono-repo task manager on top of git worktree",
   "type": "module",
   "bin": {
-    "mrtask": "dist/cli.js"
+    "mrtask": "./dist/cli.js"
   },
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.json",
+    "prepack": "npm run clean && npm run build",
     "dev": "tsx src/cli.ts --help",
     "lint": "eslint .",
     "test": "vitest run --reporter=dot"
@@ -24,7 +27,26 @@
     "typescript": "^5.9.2",
     "vitest": "^2.0.5"
   },
-    "keywords":["node", "pnpm", "monorepo", "git"],
-    "license": "MIT",
-    "homepage": "https://github.com/kubohiroya/mrtask"
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": ["node", "pnpm", "monorepo", "git"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kubohiroya/mrtask.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kubohiroya/mrtask/issues"
+  },
+  "homepage": "https://github.com/kubohiroya/mrtask#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9",
+  "publishConfig": {
+    "access": "public"
+  }
 }
