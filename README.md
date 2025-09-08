@@ -183,11 +183,10 @@ Show or edit configuration (e.g. CSV column mapping, default branch).
 ### `mrtask pr` 🔀
 Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current git diff.
 
-    mrtask pr <task-id> [task-file-path] [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]
+    mrtask pr <id|task-file-path> [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]
 
-**Arguments**
-- `<task-id>` — task id (prefix ok)
-- `[task-file-path]` — direct path to task YAML file (optional alternative to searching by ID)
+**Argument**
+- `<id|task-file-path>` — task id (prefix ok) OR direct path to task YAML file
 
 **Options**
 - `--dry-run` (default): Print PR **draft** (Title/Body) and a **compare URL** if available.
@@ -198,11 +197,11 @@ Generate a pull request from an existing task (`.mrtask/<id>.yml`) and current g
   - Creates a PR (use `--draft` for draft PRs). Otherwise, prints the compare URL.
 
 **Examples**
-    # Using task ID (existing approach)
+    # Using task ID
     mrtask pr 2025-09-08T14-03-12Z-feature_login-ui --base main --push --dry-run
-    
-    # Using direct file path (new approach)
-    mrtask pr any-id packages/app/.mrtask/2025-09-08T14-03-12Z-feature_login-ui.yml --push --dry-run
+
+    # Using direct file path
+    mrtask pr packages/app/.mrtask/2025-09-08T14-03-12Z-feature_login-ui.yml --push --dry-run
 
 ---
 
@@ -251,7 +250,7 @@ Dump tasks in a machine-friendly JSON format for AI/automation.
 
 **Output**
 - JSON array (default) or NDJSON when `--ndjson` is set.
-- Each object includes: `id`, `id_short`, `title`, `branch`, `status`, `primaryDir`, `workDirs`, `file`, `createdAt`, `tags`, `checklistCount`.
+- Each object includes: `id`, `id_short`, `title`, `description`, `branch`, `status`, `primaryDir`, `workDirs`, `file`, `createdAt`, `tags`, `checklistCount`.
 
 **Options**
 - `--all` — include open + done + cancelled (default: open only).  

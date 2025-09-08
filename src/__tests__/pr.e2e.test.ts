@@ -40,7 +40,7 @@ describe("mrtask pr stage-2 flow", () => {
     expect(files.length).toBe(1);
   });
 
-  it("dry-run prints PR draft and compare URL", async () => {
+  it("dry-run prints PR draft and compare URL (by id)", async () => {
     const files = await fg(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
     const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
     const out = runNodeBin(cli(), ["pr", id, "--base", "main", "--dry-run"], repoDir);
@@ -53,7 +53,7 @@ describe("mrtask pr stage-2 flow", () => {
     expect(fss.existsSync(prFile)).toBe(true);
   });
 
-  it("--push sets upstream for branch", () => {
+  it("--push sets upstream for branch (by id)", () => {
     const files = fg.sync(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
     const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
     const out = runNodeBin(cli(), ["pr", id, "--push", "--dry-run"], repoDir);
@@ -63,13 +63,12 @@ describe("mrtask pr stage-2 flow", () => {
     expect(ls).toMatch(/refs\/heads\/feature\/e2e/);
   });
 
-  it("accepts task file path as second argument", async () => {
+  it("accepts task file path as single argument", async () => {
     const files = await fg(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
     const taskFilePath = path.relative(repoDir, files[0]);
     const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
-    
     // Test using task file path instead of ID
-    const out = runNodeBin(cli(), ["pr", id, taskFilePath, "--base", "main", "--dry-run"], repoDir);
+    const out = runNodeBin(cli(), ["pr", taskFilePath, "--base", "main", "--dry-run"], repoDir);
     expect(out).toContain("PR DRAFT");
     expect(out).toContain("# [app] e2e task"); // title scope should be the same
     expect(out).toContain("## Summary");

@@ -37,32 +37,26 @@ program
 program
   .command("pr")
   .description("Generate a pull request from mrtask YAML and git diff")
-  .argument("<id>", "task id (prefix ok)")
-  .argument("[task-file-path]", "direct path to task YAML file (optional)")
+  .argument("<id-or-path>", "task id (prefix ok) or direct path to task YAML file")
   .option("--base <branch>", "base branch (default: main)", "main")
   .option("--remote <name>", "git remote (default: origin)", "origin")
   .option("--push", "push branch to remote if not yet upstream")
   .option("--draft", "create Draft PR when using GitHub gh CLI")
   .option("--open", "open compare/PR URL in browser")
   .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
-  .action(async (id, taskFilePath, opts) => {
+  .action(async (input, opts) => {
     try {
       const root = await findRepoRoot();
       let t;
-
-      if (taskFilePath) {
-        // Load task directly from specified file path
-        const resolvedPath = path.resolve(root, taskFilePath);
-        t = await loadTaskFromFile(resolvedPath);
+      const asPath = path.resolve(root, input);
+      if (fss.existsSync(asPath)) {
+        t = await loadTaskFromFile(asPath);
       } else {
-        // Use existing ID-based search
         let pkgs = await loadPNPMWorkspaces(root);
         if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-        // ルートも探索
         pkgs = [root, ...pkgs];
-
-        t = await findTaskById(pkgs, id);
-        if (!t) throw new Error(`Task not found: ${id}`);
+        t = await findTaskById(pkgs, input);
+        if (!t) throw new Error(`Task not found: ${input}`);
       }
 
       // PR 下書きを構築
@@ -417,6 +411,7 @@ program
           id: t.id,
           id_short: shortId(t.id),
           title: t.title,
+          description: t.description ?? null,
           branch: t.branch,
           status: t.status,
           primaryDir: t.primaryDir,
@@ -440,15 +435,20 @@ program
 
 program
   .command("show")
-  .description("Show a task by id")
-  .argument("<id>", "task id (prefix ok)")
-  .action(async (id) => {
+  .description("Show a task by id or file path")
+  .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .action(async (input) => {
     try {
       const root = await findRepoRoot();
-      let pkgs = await loadPNPMWorkspaces(root);
-      if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-      const t = await findTaskById(pkgs, id);
-      if (!t) throw new Error(`Task not found: ${id}`);
+      const asPath = path.resolve(root, input);
+      let t: any;
+      if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+      else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        t = await findTaskById([root, ...pkgs], input);
+        if (!t) throw new Error(`Task not found: ${input}`);
+      }
       console.log(JSON.stringify(t, null, 2));
     } catch (e: any) {
       console.error(`✖ show failed: ${e.message ?? e}`);
@@ -456,19 +456,23 @@ program
     }
   });
 
-async function moveTaskAndRemoveWorktree(id: string, target: "done" | "cancel") {
+async function moveTaskAndRemoveWorktree(idOrPath: string, target: "done" | "cancel") {
   const root = await findRepoRoot();
-  let pkgs = await loadPNPMWorkspaces(root);
-  if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-  pkgs = [root, ...pkgs];
-  const t = await findTaskById(pkgs, id);
-  if (!t) throw new Error(`Task not found: ${id}`);
+  const asPath = path.resolve(root, idOrPath);
+  let t: any;
+  if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+  else {
+    let pkgs = await loadPNPMWorkspaces(root);
+    if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+    t = await findTaskById([root, ...pkgs], idOrPath);
+    if (!t) throw new Error(`Task not found: ${idOrPath}`);
+  }
   const historyBase = path.join(root, MR_DIRNAME, target);
   await ensureDir(historyBase);
   const targetPath = path.join(historyBase, path.basename(t.filePath));
   await fs.rename(t.filePath, targetPath);
   // Prefer removing dedicated worktree under .mrtask/wt/<id> if present; fallback to legacy behavior
-  const wtRoot = path.join(root, MR_DIRNAME, "wt", id);
+  const wtRoot = path.join(root, MR_DIRNAME, "wt", t.id);
   if (fss.existsSync(wtRoot)) {
     worktreeRemove(wtRoot);
   } else {
@@ -481,10 +485,10 @@ async function moveTaskAndRemoveWorktree(id: string, target: "done" | "cancel") 
 program
   .command("done")
   .description("Mark task done (moves YAML to .mrtask/done/ and removes worktree)")
-  .argument("<id>", "task id (prefix ok)")
-  .action(async (id) => {
+  .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .action(async (input) => {
     try {
-      await moveTaskAndRemoveWorktree(id, "done");
+      await moveTaskAndRemoveWorktree(input, "done");
     } catch (e: any) {
       console.error(`✖ done failed: ${e.message ?? e}`);
       process.exitCode = 1;
@@ -494,10 +498,10 @@ program
 program
   .command("cancel")
   .description("Cancel task (moves YAML to .mrtask/cancel/ and removes worktree)")
-  .argument("<id>", "task id (prefix ok)")
-  .action(async (id) => {
+  .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .action(async (input) => {
     try {
-      await moveTaskAndRemoveWorktree(id, "cancel");
+      await moveTaskAndRemoveWorktree(input, "cancel");
     } catch (e: any) {
       console.error(`✖ cancel failed: ${e.message ?? e}`);
       process.exitCode = 1;
@@ -507,20 +511,25 @@ program
 program
   .command("remove")
   .description("Remove task YAML and worktree (no record kept)")
-  .argument("<id>", "task id (prefix ok)")
-  .action(async (id) => {
+  .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .action(async (input) => {
     try {
       const root = await findRepoRoot();
-      let pkgs = await loadPNPMWorkspaces(root);
-      if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-      const t = await findTaskById(pkgs, id);
-      if (!t) throw new Error(`Task not found: ${id}`);
+      const asPath = path.resolve(root, input);
+      let t: any;
+      if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+      else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        t = await findTaskById([root, ...pkgs], input);
+        if (!t) throw new Error(`Task not found: ${input}`);
+      }
       // delete YAML (primary), unlink secondary shims/links
       await fs.rm(t.filePath, { force: true });
       // remove worktree
       const primaryDir = path.resolve(root, t.primaryDir);
       worktreeRemove(primaryDir);
-      console.log(`✔ removed: ${id}`);
+      console.log(`✔ removed: ${t.id}`);
     } catch (e: any) {
       console.error(`✖ remove failed: ${e.message ?? e}`);
       process.exitCode = 1;
