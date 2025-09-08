@@ -232,8 +232,9 @@ program
       if (!taskSeg) throw new Error("missing required argument 'task-name-segment'");
       if (!dir1) throw new Error("missing required argument 'dir1'");
 
-      const primary = path.resolve(root, dir1);
-      const dirs = [primary, ...dirN.map(d => path.resolve(root, d))];
+
+      const primaryRepoPath = path.resolve(root, dir1);
+      const repoDirAbsList = [primaryRepoPath, ...dirN.map(d => path.resolve(root, d))];
 
       // If branch does not exist, decide how to handle it.
       if (!branchExists(branch)) {
@@ -255,16 +256,23 @@ program
         }
       }
 
-      // git worktree add on primary (skip in dry-run)
+      // Decide worktree root: use package path if it does not exist; otherwise place under .mrtask/wt/<id>
+      const title = (taskSeg ?? "").replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+      const id = nowId(branch, slugify(taskSeg ?? (title || "task")));
+      const wtFallback = path.join(root, MR_DIRNAME, "wt", id);
+      const useFallback = fss.existsSync(primaryRepoPath);
+      const wtRoot = useFallback ? wtFallback : primaryRepoPath;
+
+      // git worktree add (skip in dry-run)
       if (!opts.dryRun) {
-        worktreeAdd(primary, branch);
+        if (useFallback) await ensureDir(path.dirname(wtRoot));
+        worktreeAdd(wtRoot, branch);
       }
-      const mrDir = path.join(primary, MR_DIRNAME);
+      // YAML directory lives under the repository's package path (not the worktree root) for discoverability
+      const mrDir = path.join(primaryRepoPath, MR_DIRNAME);
       if (!opts.dryRun) await ensureDir(mrDir);
 
       // Task ID & YAML
-      const title = taskSeg.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
-      const id = nowId(branch, slugify(taskSeg));
       const fileName = `${id}.yml`;
       const filePath = path.join(mrDir, fileName);
 
@@ -276,8 +284,8 @@ program
         title,
         description,
         status: "open",
-        primaryDir: path.relative(root, primary),
-        workDirs: dirs.map(d => path.relative(root, d)),
+        primaryDir: dir1,
+        workDirs: [dir1, ...dirN],
         tags: [],
         checklist: [],
         relatedPRs: [],
@@ -288,7 +296,7 @@ program
         await writeYamlAtomic(filePath, task);
 
         // symlinks on secondary dirs
-        for (const d of dirs.slice(1)) {
+        for (const d of repoDirAbsList.slice(1)) {
           const linkDir = path.join(d, MR_DIRNAME);
           await ensureDir(linkDir);
           const rel = path.relative(linkDir, filePath);
@@ -303,10 +311,9 @@ program
 
       // sparse-checkout
       if (opts.sparse && !opts.dryRun) {
-        sparseInit(primary);
-        const rels = dirs.map(d => path.relative(primary, d)).map(p => p.replace(/^(\.\/)?/, ""));
-        // ルートから見たパスの方が安全だが、シンプルに
-        sparseSet(primary, rels);
+        sparseInit(wtRoot);
+        const rels = [dir1, ...dirN];
+        sparseSet(wtRoot, rels);
       }
 
       // Output section
@@ -314,7 +321,7 @@ program
         console.log(`✔ Created task ${id}`);
         if (!opts.dryRun) {
           console.log(`  YAML: ${path.relative(root, filePath)}`);
-          console.log(`  Worktree: ${path.relative(root, primary)} on branch ${branch}`);
+          console.log(`  Worktree: ${path.relative(root, wtRoot)} on branch ${branch}`);
         } else {
           console.log(`  (dry-run) No files written.`);
         }
@@ -412,8 +419,14 @@ async function moveTaskAndRemoveWorktree(id: string, target: "done" | "cancel") 
   await ensureDir(historyBase);
   const targetPath = path.join(historyBase, path.basename(t.filePath));
   await fs.rename(t.filePath, targetPath);
-  const primaryDirAbs = path.resolve(root, t.primaryDir);
-  worktreeRemove(primaryDirAbs);
+  // Prefer removing dedicated worktree under .mrtask/wt/<id> if present; fallback to legacy behavior
+  const wtRoot = path.join(root, MR_DIRNAME, "wt", id);
+  if (fss.existsSync(wtRoot)) {
+    worktreeRemove(wtRoot);
+  } else {
+    const primaryDirAbs = path.resolve(root, t.primaryDir);
+    worktreeRemove(primaryDirAbs);
+  }
   console.log(`✔ Moved to ${target}: ${path.relative(root, targetPath)}`);
 }
 
