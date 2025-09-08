@@ -185,19 +185,28 @@ program
           const idx = header.findIndex(h => h.toLowerCase() === key.toLowerCase());
           return idx >= 0 ? stripOuterQuotes((row[idx] ?? "").trim()) : "";
         };
-        // Prefer explicit columns; fallback to legacy [title, description]
+        // Prefer explicit columns; fallback to [title, description] positions only
         const csvTitle = get("title") || stripOuterQuotes((row[0]?.trim() ?? ""));
         const csvDesc = get("description") || stripOuterQuotes((row[1]?.trim() ?? ""));
         const csvBranch = get("branch");
-        const csvDir = get("dir") || get("primaryDir") || get("dir1");
-        const csvDirs = (get("dirs") || "").replace(/^\[(.*)\]$/, "$1").split(/[,;\s]+/).filter(Boolean).map(stripOuterQuotes);
+
+        // Collect dirN columns deterministically (dir1 required; no deprecated aliases)
+        const dirNs: string[] = [];
+        for (let i = 1; i <= 20; i++) {
+          const v = get(`dir${i}`);
+          if (v) dirNs.push(v);
+        }
+
+        const primaryDirCsv = dirNs[0] || "";
+        const secondaryFromNs = dirNs.slice(1);
+
         const csvSlug = get("slug");
 
         if (!description && csvDesc) description = csvDesc;
         if (!taskSeg && (csvSlug || csvTitle)) taskSeg = (csvSlug || csvTitle).toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
         if (!branch && csvBranch) branch = csvBranch;
-        if (!dir1 && csvDir) dir1 = csvDir;
-        if (dirN.length === 0 && csvDirs.length > 0) dirN = csvDirs;
+        if (!dir1 && primaryDirCsv) dir1 = primaryDirCsv;
+        if (dirN.length === 0 && secondaryFromNs.length > 0) dirN = secondaryFromNs;
       }
 
       // Interactive fallback for any still-missing required inputs when CSV mode used

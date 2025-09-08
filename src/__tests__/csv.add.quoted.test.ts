@@ -13,7 +13,7 @@ describe("CSV with quoted branch prints prompt with single quotes around branch"
     const repo = await makeTempRepo();
     await fs.writeFile(
       path.join(repo, "TASKS.csv"),
-      'title,description,branch,dir\nFrom CSV,Desc,"feature/quoted",packages/qapp\n',
+      'title,description,branch,dir1\nFrom CSV,Desc,"feature/quoted",packages/qapp\n',
       "utf8",
     );
 
@@ -32,4 +32,3 @@ describe("CSV with quoted branch prints prompt with single quotes around branch"
     expect(files.length).toBe(1);
   });
 });
-

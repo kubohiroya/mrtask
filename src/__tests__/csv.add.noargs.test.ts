@@ -22,7 +22,7 @@ describe("mrtask add -t file:line works without positional args", () => {
 
     await fs.writeFile(
       path.join(repo, "TASKS.csv"),
-      "title,description,branch,dir\nCSV Task,From CSV,feature/exist,packages/exist\n",
+      "title,description,branch,dir1\nCSV Task,From CSV,feature/exist,packages/exist\n",
       "utf8",
     );
 

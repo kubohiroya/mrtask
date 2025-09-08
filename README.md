@@ -66,11 +66,15 @@ On success (including `--dry-run`), the YAML content of the task is printed to s
 - 📝 `-d <text>` — task description (inline).  
 - 📄 `-f <file.yml>` — use an existing YAML file as the task definition.  
 - 📊 `-t <file.csv:line>` — create task from CSV line.  
-  - Recognized CSV headers: `title`, `description`, `branch`, `dir`/`primaryDir`/`dir1`, `dirs`, `slug`. Missing fields are prompted interactively.  
+  - Recognized CSV headers (simplified): `title`, `description`, `branch`, `dir1`, `dir2..dirN`, `slug`. Missing fields are prompted interactively.  
   - With `-t`, positional args are optional; values can come from CSV and prompts.  
 - 🌲 `--sparse` — enable sparse-checkout for the listed directories.  
 - 🧪 `--dry-run` — preview only; does not create branch/worktree or write files, but prints the YAML that would be written.  
 - 🤫 `--silent` — suppress output on success (errors still printed).  
+  
+CSV directory columns (simple)
+- Use `dir1` as the primary directory and `dir2..dirN` for additional directories.
+- Older aliases like `dir`, `primaryDir`, or a combined `dirs` column are not supported.
 
 **Examples**
     mrtask add feature/login-ui login-ui \

@@ -24,7 +24,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
     // simple CSV with two lines; we will reference line 2
     await fs.writeFile(
       path.join(repo, "TASKS.csv"),
-      "title,description,branch,dir\nCSV Task,From CSV,feature/csv-accept,packages/csvapp\n",
+      "title,description,branch,dir1\nCSV Task,From CSV,feature/csv-accept,packages/csvapp\n",
       "utf8",
     );
 
@@ -56,7 +56,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
     const repo = await makeTempRepo();
     await fs.writeFile(
       path.join(repo, "TASKS.csv"),
-      "title,description,branch,dir\nCSV Task,From CSV,feature/csv-decline,packages/csvapp2\n",
+      "title,description,branch,dir1\nCSV Task,From CSV,feature/csv-decline,packages/csvapp2\n",
       "utf8",
     );
 
