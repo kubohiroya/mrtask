@@ -151,7 +151,7 @@ program
         const csvTitle = get("title") || (row[0]?.trim() ?? "");
         const csvDesc = get("description") || (row[1]?.trim() ?? "");
         const csvBranch = get("branch");
-        const csvDir = get("dir") || get("primaryDir");
+        const csvDir = get("dir") || get("primaryDir") || get("dir1");
         const csvDirs = (get("dirs") || "").split(/[,;\s]+/).filter(Boolean);
         const csvSlug = get("slug");
 
