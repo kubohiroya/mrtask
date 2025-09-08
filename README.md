@@ -84,13 +84,13 @@ stateDiagram-v2
 
     note right of CMD_CANCEL
         YAML → cancel folder
-        Branch deleted (forced)
+        Branch deleted (with forced option)
         Worktree removed
     end note
 
     note right of CMD_REMOVE
         YAML deleted
-        Branch deleted (forced)
+        Branch deleted (with forced option)
         Worktree removed
     end note
  ```
