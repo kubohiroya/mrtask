@@ -8,7 +8,13 @@ import type { Task } from "./types.js";
 export async function listTaskFilesUnder(pkgOrRootDir: string): Promise<string[]> {
   const base = path.join(pkgOrRootDir, MR_DIRNAME);
   if (!fss.existsSync(base)) return [];
-  return fg(["**/*.yml", "**/*.yaml"], { cwd: base, absolute: true, onlyFiles: true });
+  // Exclude worktree and output areas under .mrtask
+  return fg(["**/*.yml", "**/*.yaml", "!wt/**", "!out/**"], {
+    cwd: base,
+    absolute: true,
+    onlyFiles: true,
+    ignore: ["wt/**", "out/**"],
+  });
 }
 
 export async function loadTaskFromFile(foundPath: string): Promise<Task & { filePath: string; linkPath?: string }> {

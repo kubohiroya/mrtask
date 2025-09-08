@@ -44,7 +44,7 @@ describe("mrtask basic flow", () => {
 
   it("list shows the open task", () => {
     const out = runNodeBin(cli(), ["list", "--short"], repoDir);
-    expect(out).toMatch(/open\s+.*e2e-task/i);
+    expect(out).toMatch(/open\s+.*e2e task/i);
   });
 
   it("show returns JSON with expected fields", async () => {

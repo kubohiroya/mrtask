@@ -96,8 +96,14 @@ Looks for `.mrtask/` directories in packages defined in `pnpm-workspace.yaml` or
 **Options**
 - `--all` — show all tasks (open + done + cancelled).  
 - `--status <open|done|cancelled>` — filter by status.  
-- `--json` — output in JSON format.  
 - `--short` — compact one-line format.  
+
+Format
+- Default: `open  [short-id] title (N dirs) [branch]` + next line with the YAML path.  
+- Short id is an 8-char hash of the full id.  
+
+Human vs. AI
+- `list` is optimized for humans. For AI/automation, use `mrtask dump` below.
 
 ---
 
@@ -237,3 +243,17 @@ The command prints a short guide to export `MRTASK_HOME` for your shell.
 
 MIT — see `LICENSE` for full text.
 MIT
+### `mrtask dump` 🤖
+
+Dump tasks in a machine-friendly JSON format for AI/automation.
+
+    mrtask dump [--all] [--status <status>] [--ndjson]
+
+**Output**
+- JSON array (default) or NDJSON when `--ndjson` is set.
+- Each object includes: `id`, `id_short`, `title`, `branch`, `status`, `primaryDir`, `workDirs`, `file`, `createdAt`, `tags`, `checklistCount`.
+
+**Options**
+- `--all` — include open + done + cancelled (default: open only).  
+- `--status <open|done|cancelled>` — filter by status.  
+- `--ndjson` — newline-delimited JSON (one JSON object per line).  

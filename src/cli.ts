@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import * as fss from "node:fs";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 import { Command } from "commander";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -348,7 +349,6 @@ program
   .description("List tasks across workspaces (.mrtask)")
   .option("--all", "show all statuses")
   .option("--status <status>", "open|done|cancelled")
-  .option("--json", "print JSON")
   .option("--short", "compact format")
   .action(async (opts) => {
     try {
@@ -362,6 +362,9 @@ program
       for (const f of found) {
         const t = await loadTaskFromFile(f);
         const key = t.filePath;
+        // Filter out non-task YAMLs (e.g., pnpm-workspace.yaml that slipped through)
+        const isValid = Boolean((t.id ?? "").trim()) && Boolean((t.branch ?? "").trim()) && Boolean((t.title ?? "").trim());
+        if (!isValid) continue;
         if (!seen.has(key)) seen.set(key, t);
       }
 
@@ -371,21 +374,66 @@ program
 
       list.sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
 
-      if (opts.json) {
-        console.log(JSON.stringify(list, null, 2));
-      } else {
-        for (const t of list) {
-          const wd = t.workDirs?.length ? ` (${t.workDirs.length} dirs)` : "";
-          if (opts.short) {
-            console.log(`${t.status?.padEnd(9)} ${t.id} ${t.title}${wd}`);
-          } else {
-            console.log(`${t.status?.padEnd(9)} ${t.id}  ${t.title}${wd}`);
-            console.log(`  ${path.relative(root, t.filePath)}`);
-          }
+      const shortId = (id: string) => crypto.createHash("sha256").update(id).digest("hex").slice(0, 8);
+      for (const t of list) {
+        const wd = t.workDirs?.length ? ` (${t.workDirs.length} dirs)` : "";
+        const idPart = `[${shortId(t.id)}] `;
+        const head = `${t.status?.padEnd(9)} ${idPart}${t.title}${wd} [${t.branch}]`;
+        if (opts.short) console.log(head);
+        else {
+          console.log(head);
+          console.log(`  ${path.relative(root, t.filePath)}`);
         }
       }
     } catch (e: any) {
       console.error(`✖ list failed: ${e.message ?? e}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("dump")
+  .description("Dump tasks as machine-friendly JSON (for AI/automation)")
+  .option("--all", "include all statuses (default: open only)")
+  .option("--status <status>", "open|done|cancelled")
+  .option("--ndjson", "newline-delimited JSON (1 object per line)")
+  .action(async (opts) => {
+    try {
+      const root = await findRepoRoot();
+      let pkgs = await loadPNPMWorkspaces(root);
+      if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+      pkgs = [root, ...pkgs];
+
+      const found: string[] = (await Promise.all(pkgs.map(d => listTaskFilesUnder(d)))).flat();
+      const shortId = (id: string) => crypto.createHash("sha256").update(id).digest("hex").slice(0, 8);
+      const rows: any[] = [];
+      for (const f of found) {
+        const t = await loadTaskFromFile(f);
+        const isValid = Boolean((t.id ?? "").trim()) && Boolean((t.branch ?? "").trim()) && Boolean((t.title ?? "").trim());
+        if (!isValid) continue;
+        if (!opts.all && !opts.status && (t.status ?? "open") !== "open") continue;
+        if (opts.status && (t.status ?? "open") !== opts.status) continue;
+        rows.push({
+          id: t.id,
+          id_short: shortId(t.id),
+          title: t.title,
+          branch: t.branch,
+          status: t.status,
+          primaryDir: t.primaryDir,
+          workDirs: t.workDirs,
+          file: path.relative(root, (t as any).filePath ?? t.filePath),
+          createdAt: t.createdAt,
+          tags: t.tags ?? [],
+          checklistCount: (t.checklist ?? []).length,
+        });
+      }
+      if (opts.ndjson) {
+        for (const r of rows) console.log(JSON.stringify(r));
+      } else {
+        console.log(JSON.stringify(rows, null, 2));
+      }
+    } catch (e: any) {
+      console.error(`✖ dump failed: ${e.message ?? e}`);
       process.exitCode = 1;
     }
   });
