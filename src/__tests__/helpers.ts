@@ -36,6 +36,20 @@ export function runNodeBin(binJsPath: string, args: string[], cwd: string) {
   });
 }
 
+export function runNodeBinWithInput(
+  binJsPath: string,
+  args: string[],
+  cwd: string,
+  inputText: string
+) {
+  return execFileSync(process.execPath, [binJsPath, ...args], {
+    cwd,
+    encoding: "utf8",
+    input: inputText,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
 export function runGit(args: string[], cwd: string) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }

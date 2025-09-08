@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import * as fss from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
+import readline from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
 import {
   MR_DIRNAME, ensureDir, nowId, slugify, writeYamlAtomic, readYaml,
   ensureOnMainOrForce, branchExists, createBranchFromMain,
@@ -121,8 +123,24 @@ program
       const primary = path.resolve(root, dir1);
       const dirs = [primary, ...dirN.map(d => path.resolve(root, d))];
 
+      // If branch does not exist, decide how to handle it.
       if (!branchExists(branch)) {
-        createBranchFromMain(branch, "main");
+        // For CSV-driven adds, ask before creating the branch to avoid surprises.
+        if (opts.fromCsv) {
+          const rl = readline.createInterface({ input, output });
+          const ans = (await rl.question("This branch does not exist. Create it now? (y/N) ")).trim().toLowerCase();
+          await rl.close();
+          if (ans === "y") {
+            createBranchFromMain(branch, "main");
+          } else {
+            console.error("Aborted. Branch not created.");
+            process.exitCode = 1;
+            return;
+          }
+        } else {
+          // Non-CSV mode keeps existing behavior (auto-create from main/base).
+          createBranchFromMain(branch, "main");
+        }
       }
 
       // git worktree add on primary
