@@ -1,10 +1,9 @@
 {
   "name": "mrtask",
-  "version": "0.6.2",
-
+  "version": "0.7.0",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
-  "description": "Mono-repo task manager on top of git worktree",
+  "description": "command-line tool that helps developers manage task-specific worktrees in mono-repositories",
   "type": "module",
   "bin": {
     "mrtask": "./dist/cli.js"
@@ -14,11 +13,14 @@
     "build": "tsc -p tsconfig.json",
     "prepack": "npm run clean && npm run build",
     "dev": "tsx src/cli.ts --help",
+    "guard": "tsx src/dep-fense/cli.ts",
+    "hooks:install": "tsx src/hooks/install.ts",
     "lint": "eslint .",
     "test": "vitest run --reporter=dot"
   },
   "dependencies": {
     "commander": "^12.1.0",
+    "dep-fence": "^0.3.0",
     "fast-glob": "^3.3.3",
     "yaml": "^2.8.1"
   },
@@ -26,14 +28,19 @@
     "@types/node": "^20.19.13",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^2.0.5"
+    "vitest": "^2.1.9"
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
-  "keywords": ["node", "pnpm", "monorepo", "git"],
+  "keywords": [
+    "node",
+    "pnpm",
+    "monorepo",
+    "git"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

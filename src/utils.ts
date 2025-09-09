@@ -111,6 +111,24 @@ export function gitRoot(cwd?: string) {
   return git(["rev-parse", "--show-toplevel"], { cwd });
 }
 
+export function fetchAll(cwd?: string) {
+  try { git(["fetch", "--all", "--prune"], { cwd }); } catch {}
+}
+
+export function isMergedOrEquivalent(branch: string, baseRef: string, cwd?: string): boolean {
+  // 1) Fast path: branch is ancestor of base (merged via merge/rebase/ff)
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", branch, baseRef], { cwd });
+    return true; // exit code 0 -> ancestor
+  } catch {}
+  // 2) Snapshot equality: trees identical (typical after squash merge)
+  try {
+    execFileSync("git", ["diff", "--quiet", `${baseRef}`, `${branch}`], { cwd });
+    return true; // no diff
+  } catch {}
+  return false;
+}
+
 export function statStatusFromPath(p: string): TaskStatus {
   if (p.includes(`${MR_DIRNAME}/done/`)) return "done";
   if (p.includes(`${MR_DIRNAME}/cancel/`)) return "cancelled";

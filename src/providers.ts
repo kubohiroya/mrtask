@@ -85,3 +85,22 @@ export function planPR(spec: PRSpec, compareUrl: string | null): string {
   lines.push(`Compare: ${compareUrl ?? "(no compare URL available)"}`);
   return lines.join("\n");
 }
+
+export function findOpenPrNumberByHead(branch: string, cwd: string): number | null {
+  try {
+    const out = execFileSync("gh", [
+      "pr", "list", "--state", "open", "--head", branch, "--json", "number", "-q", ".[0].number"
+    ], { cwd, encoding: "utf8" }).trim();
+    const n = Number(out);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export function mergePrWithGh(pr: string | number, opts: { strategy: 'squash' | 'merge' | 'rebase'; deleteBranch?: boolean; yes?: boolean; cwd: string }): void {
+  const args = ["pr", "merge", String(pr), `--${opts.strategy}`];
+  if (opts.deleteBranch) args.push("--delete-branch");
+  if (opts.yes) args.push("--yes");
+  execFileSync("gh", args, { cwd: opts.cwd, stdio: "inherit" });
+}

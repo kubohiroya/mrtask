@@ -17,8 +17,8 @@ import { listTaskFilesUnder, loadTaskFromFile, findTaskById } from "./tasks.js";
 import type { Task } from "./types.js";
 // ★ 追加
 import { buildPRSpec } from "./builder.js";
-import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR } from "./providers.js";
-import { git } from "./utils.js";
+import { buildCompareUrl, createPRWithGh, ensurePushed, getRemoteUrl, openInBrowser, planPR, findOpenPrNumberByHead, mergePrWithGh } from "./providers.js";
+import { git, fetchAll, isMergedOrEquivalent } from "./utils.js";
 import { detectProjectName, ensureHome, printInitGuide } from "./home.js";
 
 // Resolve package version without JSON import attributes (Node 18 compatible)
@@ -35,71 +35,6 @@ program
   .description("Mono-repo task manager on top of git worktree")
   .version(String(pkgVersion));
 
-program
-  .command("pr")
-  .description("Generate a pull request from mrtask YAML and git diff")
-  .argument("<id-or-path>", "task id (prefix ok) or direct path to task YAML file")
-  .option("--base <branch>", "base branch (default: main)", "main")
-  .option("--remote <name>", "git remote (default: origin)", "origin")
-  .option("--push", "push branch to remote if not yet upstream")
-  .option("--draft", "create Draft PR when using GitHub gh CLI")
-  .option("--open", "open compare/PR URL in browser")
-  .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
-  .action(async (input, opts) => {
-    try {
-      const root = await findRepoRoot();
-      let t;
-      const asPath = path.resolve(root, input);
-      if (fss.existsSync(asPath)) {
-        t = await loadTaskFromFile(asPath);
-      } else {
-        let pkgs = await loadPNPMWorkspaces(root);
-        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
-        pkgs = [root, ...pkgs];
-        t = await findTaskById(pkgs, input);
-        if (!t) throw new Error(`Task not found: ${input}`);
-      }
-
-      // PR 下書きを構築
-      const spec = buildPRSpec(t, opts.base, root);
-
-      // リモート情報と compare URL
-      const remoteUrl = getRemoteUrl(opts.remote, root);
-      const compareUrl = buildCompareUrl(remoteUrl, spec.base, spec.head);
-
-      // --push が指定なら upstream 設定まで行う
-      if (opts.push) {
-        if (!remoteUrl) throw new Error(`Remote not found: ${opts.remote}`);
-        ensurePushed(opts.remote, t.branch, root);
-      }
-
-      // dry-run: 標準出力＆ファイル保存して終了
-      if (opts.dryRun) {
-        const outText = planPR(spec, compareUrl);
-        console.log(outText);
-        // ファイルにも書き出す
-        const outDir = path.join(root, MR_DIRNAME, "out");
-        await ensureDir(outDir);
-        await writeYamlAtomic(path.join(outDir, `${t.id}.pr.md`), outText);
-        if (opts.open && compareUrl) openInBrowser(compareUrl);
-        return;
-      }
-
-      // 実PR: gh が使えれば作成、なければ compare URL を出力
-      let createdUrl = compareUrl ?? null;
-      try {
-        createdUrl = createPRWithGh(spec, { draft: !!opts.draft, base: opts.base, cwd: root }) || compareUrl;
-      } catch {
-        // gh が無い/失敗 → compare URL でフォールバック
-        console.log("gh CLI not available or failed; showing compare URL instead.");
-      }
-      console.log(`PR: ${createdUrl ?? "(no URL available)"}`);
-      if (opts.open && createdUrl) openInBrowser(createdUrl);
-    } catch (e: any) {
-      console.error(`✖ pr failed: ${e.message ?? e}`);
-      process.exitCode = 1;
-    }
-  });
 
 program
   .command("init")
@@ -457,6 +392,72 @@ program
     }
   });
 
+program
+  .command("pr")
+  .description("Generate a pull request from mrtask YAML and git diff")
+  .argument("<id-or-path>", "task id (prefix ok) or direct path to task YAML file")
+  .option("--base <branch>", "base branch (default: main)", "main")
+  .option("--remote <name>", "git remote (default: origin)", "origin")
+  .option("--push", "push branch to remote if not yet upstream")
+  .option("--draft", "create Draft PR when using GitHub gh CLI")
+  .option("--open", "open compare/PR URL in browser")
+  .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
+  .action(async (input, opts) => {
+    try {
+      const root = await findRepoRoot();
+      let t;
+      const asPath = path.resolve(root, input);
+      if (fss.existsSync(asPath)) {
+        t = await loadTaskFromFile(asPath);
+      } else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        pkgs = [root, ...pkgs];
+        t = await findTaskById(pkgs, input);
+        if (!t) throw new Error(`Task not found: ${input}`);
+      }
+
+      // PR 下書きを構築
+      const spec = buildPRSpec(t, opts.base, root);
+
+      // リモート情報と compare URL
+      const remoteUrl = getRemoteUrl(opts.remote, root);
+      const compareUrl = buildCompareUrl(remoteUrl, spec.base, spec.head);
+
+      // --push が指定なら upstream 設定まで行う
+      if (opts.push) {
+        if (!remoteUrl) throw new Error(`Remote not found: ${opts.remote}`);
+        ensurePushed(opts.remote, t.branch, root);
+      }
+
+      // dry-run: 標準出力＆ファイル保存して終了
+      if (opts.dryRun) {
+        const outText = planPR(spec, compareUrl);
+        console.log(outText);
+        // ファイルにも書き出す
+        const outDir = path.join(root, MR_DIRNAME, "out");
+        await ensureDir(outDir);
+        await writeYamlAtomic(path.join(outDir, `${t.id}.pr.md`), outText);
+        if (opts.open && compareUrl) openInBrowser(compareUrl);
+        return;
+      }
+
+      // 実PR: gh が使えれば作成、なければ compare URL を出力
+      let createdUrl = compareUrl ?? null;
+      try {
+        createdUrl = createPRWithGh(spec, { draft: !!opts.draft, base: opts.base, cwd: root }) || compareUrl;
+      } catch {
+        // gh が無い/失敗 → compare URL でフォールバック
+        console.log("gh CLI not available or failed; showing compare URL instead.");
+      }
+      console.log(`PR: ${createdUrl ?? "(no URL available)"}`);
+      if (opts.open && createdUrl) openInBrowser(createdUrl);
+    } catch (e: any) {
+      console.error(`✖ pr failed: ${e.message ?? e}`);
+      process.exitCode = 1;
+    }
+  });
+
 async function moveTaskAndRemoveWorktree(idOrPath: string, target: "done" | "cancel") {
   const root = await findRepoRoot();
   const asPath = path.resolve(root, idOrPath);
@@ -494,16 +495,15 @@ async function moveTaskAndRemoveWorktree(idOrPath: string, target: "done" | "can
 
 program
   .command("done")
-  .description("Mark task done (moves YAML to .mrtask/done/ and removes worktree)")
+  .description("Mark task done: verify merged state, then move YAML to .mrtask/done/ and remove worktree")
   .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .option("--base <branch>", "base branch to verify against (default: main)", "main")
+  .option("--remote <name>", "remote to fetch before verifying (default: origin)", "origin")
   .option("--keep-branch", "do not delete the branch (default: delete safely)")
   .option("--force-delete-branch", "force delete local branch even if not merged (-D)")
   .option("--delete-remote", "also delete remote branch if upstream exists")
-  .option("--remote <name>", "remote name for deletion (default: origin)", "origin")
   .action(async (input, optsCmd) => {
     try {
-      await moveTaskAndRemoveWorktree(input, "done");
-      // branch deletion policy for done: safe delete by default
       const root = await findRepoRoot();
       const asPath = path.resolve(root, input);
       let t: any;
@@ -512,7 +512,33 @@ program
         let pkgs = await loadPNPMWorkspaces(root);
         if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
         t = await findTaskById([root, ...pkgs], input);
+        if (!t) throw new Error(`Task not found: ${input}`);
       }
+      // Verify merge state before cleanup
+      const base = optsCmd.base ?? "main";
+      const remote = optsCmd.remote ?? "origin";
+      try { fetchAll(root); } catch {}
+      const baseRef = ((): string => {
+        const cand = `${remote}/${base}`;
+        try { git(["rev-parse", "--verify", cand], { cwd: root }); return cand; } catch { return base; }
+      })();
+      const merged = isMergedOrEquivalent(t.branch, baseRef, root);
+      if (!merged && !optsCmd.forceDeleteBranch) {
+        console.error(`✖ Not merged: branch '${t.branch}' is not merged into '${baseRef}'.`);
+        console.error(`  Hint: open/merge a PR first:`);
+        console.error(`    mrtask pr ${input} --base ${base} --push --open`);
+        console.error(`  Or accept explicitly (GitHub):`);
+        console.error(`    mrtask accept ${input} --strategy squash --delete-branch`);
+        console.error(`  If you intend to abandon the work, use:`);
+        console.error(`    mrtask cancel ${input}   # keeps record`);
+        console.error(`    mrtask remove ${input}   # deletes record`);
+        process.exitCode = 2;
+        return;
+      }
+
+      // Proceed with cleanup
+      await moveTaskAndRemoveWorktree(input, "done");
+      // branch deletion policy for done: safe delete by default
       const optsLocal: any = optsCmd ?? {};
       if (t && !optsLocal.keepBranch) {
         try {
@@ -531,6 +557,71 @@ program
       }
     } catch (e: any) {
       console.error(`✖ done failed: ${e.message ?? e}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("accept")
+  .description("Accept a task by merging its PR (GitHub via gh) or fast-forward locally (opt-in)")
+  .argument("<id-or-path>", "task id (prefix ok) or direct YAML path")
+  .option("--strategy <squash|merge|rebase>", "merge strategy when using gh (default: squash)", "squash")
+  .option("--delete-branch", "delete the branch on merge (when using gh)")
+  .option("--yes", "assume yes for gh prompts")
+  .option("--base <branch>", "base branch (default: main)", "main")
+  .option("--remote <name>", "remote (default: origin)", "origin")
+  .option("--local-ff", "perform local fast-forward merge into base if possible (no gh)")
+  .action(async (input, opts) => {
+    try {
+      const root = await findRepoRoot();
+      const asPath = path.resolve(root, input);
+      let t: any;
+      if (fss.existsSync(asPath)) t = await loadTaskFromFile(asPath);
+      else {
+        let pkgs = await loadPNPMWorkspaces(root);
+        if (pkgs == null) pkgs = await loadFallbackWorkspaces(root);
+        t = await findTaskById([root, ...pkgs], input);
+        if (!t) throw new Error(`Task not found: ${input}`);
+      }
+
+      const remote = opts.remote ?? "origin";
+      const base = opts.base ?? "main";
+      fetchAll(root);
+      // Try GitHub first
+      try {
+        const remoteUrl = getRemoteUrl(remote, root);
+        if (!remoteUrl) throw new Error("remote URL not found");
+        ensurePushed(remote, t.branch, root);
+        const prNum = findOpenPrNumberByHead(t.branch, root);
+        if (prNum == null) {
+          console.log("No open PR found for this branch. Create one first: \n  mrtask pr", input, "--push --open");
+          return;
+        }
+        mergePrWithGh(prNum, { strategy: opts.strategy, deleteBranch: !!opts.deleteBranch, yes: !!opts.yes, cwd: root });
+        console.log(`✔ PR merged (#${prNum}) using strategy: ${opts.strategy}`);
+        return;
+      } catch {
+        // Fallback: local fast-forward if explicitly allowed
+        if (!opts.localFf) {
+          console.error("✖ gh merge failed or not available. Use --local-ff to attempt a local fast-forward merge, or install GitHub CLI.");
+          process.exitCode = 2;
+          return;
+        }
+        const baseRef = `${remote}/${base}`;
+        // Switch to base safely and try ff-only
+        const prev = git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root });
+        try {
+          git(["switch", base], { cwd: root });
+          try { git(["merge", "--ff-only", t.branch], { cwd: root }); }
+          catch (e: any) { throw new Error(`Fast-forward not possible: ${e?.message ?? e}`); }
+          try { git(["push", remote, base], { cwd: root }); } catch {}
+          console.log(`✔ Locally fast-forwarded ${base} <- ${t.branch} and pushed to ${remote}`);
+        } finally {
+          try { git(["switch", prev], { cwd: root }); } catch {}
+        }
+      }
+    } catch (e: any) {
+      console.error(`✖ accept failed: ${e.message ?? e}`);
       process.exitCode = 1;
     }
   });
