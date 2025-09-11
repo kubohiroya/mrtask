@@ -235,8 +235,8 @@ Why two diagrams?
 
 `mrtask` runs a thin guard runner and uses guard rules from `dep-fence/guards`. Configure all rules in a single file at the repo root:
 
-- `.mrtask/dep-fense.config.ts` (default)
-- Override with `DEP_FENSE_CONFIG=/path/to/config.ts`
+- `.mrtask/dep-fence.config.ts` (default)
+- Override with `DEP_FENCE_CONFIG=/path/to/config.ts`
 
 Run modes
 - `pre-commit` — checks staged files (local hygiene)
@@ -452,7 +452,7 @@ Guards: See “Guard Timeline”. Pre-commit still applies; no PR/push in this p
 - upstream‑conflict keeps failing
   - `git fetch --all` and rebase/merge as needed. The rule fails when protected files have upstream changes by other authors since your base.
 - Unexpected path excluded by a glob
-  - Review order and negations in `.mrtask/dep-fense.config.ts`. Put `!` exclusions last for readability.
+  - Review order and negations in `.mrtask/dep-fence.config.ts`. Put `!` exclusions last for readability.
 - `mrtask done` says "Not merged"
   - Create/merge a PR first: `mrtask pr <id> --push --open` and merge on the platform, or run `mrtask accept <id> --strategy squash` to merge via GitHub CLI. Then run `mrtask done <id>` again.
 
@@ -461,7 +461,7 @@ Guards: See “Guard Timeline”. Pre-commit still applies; no PR/push in this p
 ## Design Notes
 
 - Logical branch names stay constant; physical branches get auto‑unique suffixes for multiple worktrees.
-- SSOT: per‑package `.mrtask/` stays in `main`. Guard config lives centrally at `.mrtask/dep-fense.config.ts`.
+- SSOT: per‑package `.mrtask/` stays in `main`. Guard config lives centrally at `.mrtask/dep-fence.config.ts`.
 - Hooks focus on staged changes at pre-commit; pre-push/CI re‑checks with upstream awareness.
 - Rules are path/glob based with no hidden timing or freshness heuristics beyond optional mtime tolerance.
 
