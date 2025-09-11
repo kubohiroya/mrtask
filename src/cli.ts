@@ -401,7 +401,8 @@ program
   .option("--push", "push branch to remote if not yet upstream")
   .option("--draft", "create Draft PR when using GitHub gh CLI")
   .option("--open", "open compare/PR URL in browser")
-  .option("--dry-run", "do not create PR via provider; print PR draft and compare URL", true)
+  .option("--dry-run", "do not create PR via provider; skip git side effects; print PR draft and compare URL", true)
+  .option("--no-dry-run", "override default dry-run to enable side effects explicitly")
   .action(async (input, opts) => {
     try {
       const root = await findRepoRoot();
@@ -424,8 +425,8 @@ program
       const remoteUrl = getRemoteUrl(opts.remote, root);
       const compareUrl = buildCompareUrl(remoteUrl, spec.base, spec.head);
 
-      // --push が指定なら upstream 設定まで行う
-      if (opts.push) {
+      // --push が指定なら upstream 設定まで行う（dry-run の場合はスキップ）
+      if (opts.push && !opts.dryRun) {
         if (!remoteUrl) throw new Error(`Remote not found: ${opts.remote}`);
         ensurePushed(opts.remote, t.branch, root);
       }

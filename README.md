@@ -131,7 +131,11 @@ pnpm run hooks:install  # adds pre-commit / pre-push that run the guards
 3) Open a PR when ready
 
 ```bash
-mrtask pr <id> --push --dry-run
+# Preview (no git side effects)
+mrtask pr <id> --dry-run
+
+# Then actually push upstream and open/compare as needed
+mrtask pr <id> --push --no-dry-run
 ```
 
 4) Wrap up
@@ -314,7 +318,7 @@ Add `.mrtask/session.json` to narrow `allow`/`watch` for a specific worktree:
 - Machine‑friendly JSON/NDJSON of tasks for automation.
 
 `mrtask pr <id|path> [--base main] [--remote origin] [--push] [--draft] [--open] [--dry-run]`
-- Build a PR draft from the task + current diff. With `--push`, sets upstream and prints/open compare/PR.
+- Build a PR draft from the task + current diff. With `--push`, sets upstream and prints/open compare/PR. With `--dry-run`, no git operations are performed (e.g. `--push` is ignored).
 
 `mrtask done <id>`
 - Verify merged state, then move YAML to `.mrtask/done/`, remove worktree, delete branch safely.

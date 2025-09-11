@@ -53,14 +53,23 @@ describe("mrtask pr stage-2 flow", () => {
     expect(fss.existsSync(prFile)).toBe(true);
   });
 
-  it("--push sets upstream for branch (by id)", () => {
+  it("--dry-run should not push even with --push", () => {
     const files = fg.sync(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
     const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
     const out = runNodeBin(cli(), ["pr", id, "--push", "--dry-run"], repoDir);
-    expect(out).toContain("PR DRAFT"); // still dry-run, but push executed
-    // verify remote branch exists
+    expect(out).toContain("PR DRAFT");
+    // verify remote branch does NOT exist
     const ls = execSync("git ls-remote --heads origin", { cwd: repoDir, encoding: "utf8" });
-    expect(ls).toMatch(/refs\/heads\/feature\/e2e/);
+    expect(ls).not.toMatch(/refs\/heads\/feature\/e2e/);
+  });
+
+  it("--push sets upstream when not dry-run", () => {
+    const files = fg.sync(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
+    const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
+    const out = runNodeBin(cli(), ["pr", id, "--push", "--no-dry-run"], repoDir);
+    expect(out).toMatch(/PR:|gh CLI not available|Compare:/); // creation or fallback output
+    const ls2 = execSync("git ls-remote --heads origin", { cwd: repoDir, encoding: "utf8" });
+    expect(ls2).toMatch(/refs\/heads\/feature\/e2e/);
   });
 
   it("accepts task file path as single argument", async () => {

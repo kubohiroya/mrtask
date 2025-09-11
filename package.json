@@ -1,6 +1,6 @@
 {
   "name": "mrtask",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
   "description": "command-line tool that helps developers manage task-specific worktrees in mono-repositories",
