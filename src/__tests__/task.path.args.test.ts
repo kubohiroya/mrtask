@@ -43,4 +43,34 @@ describe("id or file path accepted in show/done/cancel/remove", () => {
     expect(out).toMatch(/Worktree removed:/);
     expect(out).toMatch(/Branch deleted \(local, forced\):/);
   });
+
+  it("done/cancel/remove accept 8-char short hash id", async () => {
+    const repo = await makeTempRepo();
+    runNodeBin(cli(), ["add", "feature/short", "short", "packages/app"], repo);
+    const files = await fg(["packages/app/.mrtask/*.yml"], { cwd: repo, absolute: true });
+    const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
+    const crypto = await import("node:crypto");
+    const short = crypto.createHash("sha256").update(id).digest("hex").slice(0, 8);
+
+    // done
+    const outDone = runNodeBin(cli(), ["done", short], repo);
+    expect(outDone).toMatch(/Moved to done/);
+
+    // recreate a task for cancel/remove
+    runNodeBin(cli(), ["add", "feature/short2", "short2", "packages/app"], repo);
+    const files2 = await fg(["packages/app/.mrtask/*.yml"], { cwd: repo, absolute: true });
+    const id2 = path.basename(files2[0]).replace(/\.(ya?ml)$/i, "");
+    const short2 = crypto.createHash("sha256").update(id2).digest("hex").slice(0, 8);
+
+    const outCancel = runNodeBin(cli(), ["cancel", short2], repo);
+    expect(outCancel).toMatch(/Moved to cancel/);
+
+    // recreate again for remove
+    runNodeBin(cli(), ["add", "feature/short3", "short3", "packages/app"], repo);
+    const files3 = await fg(["packages/app/.mrtask/*.yml"], { cwd: repo, absolute: true });
+    const id3 = path.basename(files3[0]).replace(/\.(ya?ml)$/i, "");
+    const short3 = crypto.createHash("sha256").update(id3).digest("hex").slice(0, 8);
+    const outRemove = runNodeBin(cli(), ["remove", short3], repo);
+    expect(outRemove).toMatch(/removed:/);
+  });
 });

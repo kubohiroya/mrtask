@@ -11,7 +11,7 @@ beforeAll(() => {
   buildProjectOrThrow();
 });
 
-describe("mrtask add -t file:line works without positional args", () => {
+describe("mrtask create -t file:line works without positional args", () => {
   it("creates task when branch already exists (no prompt)", async () => {
     const repo = await makeTempRepo();
     // create branch beforehand
@@ -28,7 +28,7 @@ describe("mrtask add -t file:line works without positional args", () => {
 
     const out = runNodeBinWithInput(
       cli(),
-      ["add", "-t", "TASKS.csv:2"],
+      ["create", "-t", "TASKS.csv:2"],
       repo,
       "\n",
     );
@@ -57,7 +57,7 @@ describe("mrtask add -t file:line works without positional args", () => {
       "packages/prompted\n",
     ].join("");
 
-    const res = runNodeBinWithResult(cli(), ["add", "-t", "TASKS.csv:2"], repo, input);
+    const res = runNodeBinWithResult(cli(), ["create", "-t", "TASKS.csv:2"], repo, input);
     expect(res.status).toBe(0);
     expect(res.stdout).toContain("Enter branch name");
     expect(res.stdout).toContain("Enter primary work dir");

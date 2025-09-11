@@ -8,12 +8,12 @@ const cli = () => distCliPath();
 
 beforeAll(() => buildProjectOrThrow());
 
-describe("mrtask add output behavior", () => {
+describe("mrtask create output behavior", () => {
   it("prints YAML content on success", async () => {
     const repo = await makeTempRepo();
     const res = runNodeBinWithResult(
       cli(),
-      ["add", "feature/print", "print", "-d", "hello", "packages/app"],
+      ["create", "feature/print", "print", "-d", "hello", "packages/app"],
       repo,
     );
     expect(res.status).toBe(0);
@@ -30,7 +30,7 @@ describe("mrtask add output behavior", () => {
     const repo = await makeTempRepo();
     const res = runNodeBinWithResult(
       cli(),
-      ["add", "feature/dry", "dry", "--dry-run", "packages/dryapp"],
+      ["create", "feature/dry", "dry", "--dry-run", "packages/dryapp"],
       repo,
     );
     expect(res.status).toBe(0);
@@ -45,7 +45,7 @@ describe("mrtask add output behavior", () => {
     const repo = await makeTempRepo();
     const res = runNodeBinWithResult(
       cli(),
-      ["add", "feature/silent", "silent", "--silent", "packages/silentapp"],
+      ["create", "feature/silent", "silent", "--silent", "packages/silentapp"],
       repo,
     );
     expect(res.status).toBe(0);
@@ -55,4 +55,3 @@ describe("mrtask add output behavior", () => {
     expect(files.length).toBe(1);
   });
 });
-

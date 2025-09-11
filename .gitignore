@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 *~
 .npm-cache/
 
+TASKS.md

@@ -53,6 +53,16 @@ describe("mrtask pr stage-2 flow", () => {
     expect(fss.existsSync(prFile)).toBe(true);
   });
 
+  it("dry-run accepts 8-char short hash id", async () => {
+    const files = await fg(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
+    const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");
+    // Compute short hash as in list output
+    const crypto = await import("node:crypto");
+    const short = crypto.createHash("sha256").update(id).digest("hex").slice(0, 8);
+    const out = runNodeBin(cli(), ["pr", short, "--base", "main", "--dry-run"], repoDir);
+    expect(out).toContain("PR DRAFT");
+  });
+
   it("--dry-run should not push even with --push", () => {
     const files = fg.sync(["packages/app/.mrtask/*.yml"], { cwd: repoDir, absolute: true });
     const id = path.basename(files[0]).replace(/\.(ya?ml)$/i, "");

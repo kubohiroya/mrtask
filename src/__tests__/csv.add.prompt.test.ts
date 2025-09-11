@@ -17,7 +17,7 @@ beforeAll(() => {
   buildProjectOrThrow();
 });
 
-describe("mrtask add --from-csv prompts for missing branch", () => {
+describe("mrtask create --from-csv prompts for missing branch", () => {
   it("creates the branch and continues when 'y' is entered", async () => {
     const repo = await makeTempRepo();
 
@@ -31,7 +31,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
     const out = runNodeBinWithInput(
       cli(),
       [
-        "add",
+        "create",
         "feature/csv-accept",
         "csv-accept",
         "-t",
@@ -65,7 +65,7 @@ describe("mrtask add --from-csv prompts for missing branch", () => {
       runNodeBinWithInput(
         cli(),
         [
-          "add",
+          "create",
           "-t",
           "TASKS.csv:2",
         ],
