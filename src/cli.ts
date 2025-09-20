@@ -139,16 +139,28 @@ program
       // Decide worktree placement
       const title = (taskSeg ?? '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
       const id = nowId(branch, slugify(taskSeg ?? (title || 'task')));
-      const repoName = path.basename(root);
-      const siblingBase = path.join(path.dirname(root), `${repoName}-wt`);
+      const repoParent = path.dirname(root);
+      const branchSegments = branch.split('/').filter(Boolean);
       const homeBaseLazy = () => ensureHome(detectProjectName()).wtBase;
       const repoSubdirBase = path.join(root, '.worktrees');
+      const siblingFallback = path.join(repoParent, ...branchSegments);
       const mode = String(opts.wtMode || 'sibling');
-      const base = mode === 'home' ? homeBaseLazy() : mode === 'repo-subdir' ? repoSubdirBase : siblingBase;
-      const wtFallback = path.join(base, id);
-      const useFallback = fss.existsSync(primaryRepoPath);
-      const wtRoot = useFallback ? wtFallback : primaryRepoPath;
-      if (!opts.dryRun) { if (useFallback) await ensureDir(path.dirname(wtRoot)); worktreeAdd(wtRoot, branch); }
+
+      let fallbackRoot = siblingFallback;
+      if (mode === 'home') {
+        fallbackRoot = path.join(homeBaseLazy(), id);
+      } else if (mode === 'repo-subdir') {
+        fallbackRoot = path.join(repoSubdirBase, id);
+      }
+
+      const wtRoot = fallbackRoot;
+      if (!opts.dryRun) {
+        if (fss.existsSync(wtRoot)) {
+          throw new Error(`Target worktree directory already exists: ${wtRoot}`);
+        }
+        await ensureDir(path.dirname(wtRoot));
+        worktreeAdd(wtRoot, branch);
+      }
 
       // Write YAML under the repository's package path
       const mrDir = path.join(primaryRepoPath, MR_DIRNAME);
@@ -791,12 +803,17 @@ function resolveWorktreeRootForTask(t: any, root: string) {
   let homeBase: string | null = null;
   try { homeBase = ensureHome(detectProjectName()).wtBase; } catch { homeBase = null; }
   const repoName = path.basename(root);
-  const siblingBase = path.join(path.dirname(root), `${repoName}-wt`);
+  const repoParent = path.dirname(root);
+  const legacySiblingBase = path.join(repoParent, `${repoName}-wt`);
+  const branchSegments = String(t.branch || '').split('/').filter(Boolean);
+  const branchSibling = branchSegments.length ? path.join(repoParent, ...branchSegments) : null;
   const candidates = [
     path.join(root, MR_DIRNAME, "wt", t.id), // legacy in-repo
     ...(homeBase ? [path.join(homeBase, t.id)] : []), // home base (if available)
     path.join(root, ".worktrees", t.id),     // repo-subdir base
-    path.join(siblingBase, t.id),             // sibling base
+    ...(branchSibling ? [branchSibling] : []), // sibling base (2025-09 update: branch path)
+    path.join(repoParent, t.id),              // sibling base (2025-09 update)
+    path.join(legacySiblingBase, t.id),       // legacy sibling base (<repo>-wt)
     path.resolve(root, t.primaryDir),
   ];
   for (const c of candidates) if (fss.existsSync(c)) return c;

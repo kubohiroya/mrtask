@@ -1,6 +1,6 @@
 {
   "name": "mrtask",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "private": false,
   "description": "command-line tool that helps developers manage task-specific worktrees in mono-repositories",
@@ -36,10 +36,11 @@
     "LICENSE"
   ],
   "keywords": [
-    "node",
-    "pnpm",
+    "kanban",
+    "git",
+    "worktree",
     "monorepo",
-    "git"
+    "dep-fence"
   ],
   "license": "MIT",
   "repository": {

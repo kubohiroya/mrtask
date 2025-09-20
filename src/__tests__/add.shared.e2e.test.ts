@@ -24,6 +24,10 @@ describe('mrtask add (shared) end-to-end', () => {
     const m1 = outCreate.match(/YAML: (.+)\n\s+Worktree: (.+) on branch ([^\n]+)/);
     expect(m1).toBeTruthy();
     const parentYamlRel = m1![1];
+    const parentWtRel = m1![2];
+    const parentWtAbs = path.resolve(repo, parentWtRel);
+    const repoParent = path.dirname(repo);
+    expect(path.relative(repoParent, parentWtAbs)).not.toMatch(/^\.\./);
 
     // Add a shared child task pointing to the parent
     const outAdd = runNodeBin(
@@ -37,6 +41,9 @@ describe('mrtask add (shared) end-to-end', () => {
     const childYamlRel = m2![1];
     const childYamlAbs = path.resolve(repo, childYamlRel);
     expect(fss.existsSync(childYamlAbs)).toBe(true);
+    const childWtRel = m2![2];
+    const childWtAbs = path.resolve(repo, childWtRel);
+    expect(path.relative(repoParent, childWtAbs)).not.toMatch(/^\.\./);
 
     // Validate YAML contents: mode shared and parentId set
     const childY = YAML.parse(await fs.readFile(childYamlAbs, 'utf8'));
@@ -48,4 +55,3 @@ describe('mrtask add (shared) end-to-end', () => {
     expect(files.length).toBe(2);
   });
 });
-

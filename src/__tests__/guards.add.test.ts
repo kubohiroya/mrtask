@@ -21,6 +21,8 @@ describe('guards option writes YAML and config appropriately', () => {
     const wtRel = match![2];
     const yamlAbs = path.resolve(repo, yamlRel);
     const wtAbs = path.resolve(repo, wtRel);
+    const repoParent = path.dirname(repo);
+    expect(path.relative(repoParent, wtAbs)).not.toMatch(/^\.\./);
     const y = YAML.parse(await fs.readFile(yamlAbs, 'utf8'));
     expect(y.guards?.level).toBe('error');
     const cfg = path.join(wtAbs, '.mrtask', 'dep-fence.config.ts');
@@ -37,10 +39,11 @@ describe('guards option writes YAML and config appropriately', () => {
     expect(match).toBeTruthy();
     const yamlAbs = path.resolve(repo, match![1]);
     const wtAbs = path.resolve(repo, match![2]);
+    const repoParent = path.dirname(repo);
+    expect(path.relative(repoParent, wtAbs)).not.toMatch(/^\.\./);
     const y = YAML.parse(await fs.readFile(yamlAbs, 'utf8'));
     expect(y.guards?.level).toBe('ignore');
     const cfg = path.join(wtAbs, '.mrtask', 'dep-fence.config.ts');
     expect(fss.existsSync(cfg)).toBe(false);
   });
 });
-

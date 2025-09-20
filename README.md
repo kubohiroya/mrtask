@@ -188,9 +188,10 @@ mrtask remove --taskid <short8>
 ## Concepts & Defaults
 
 - Worktree placement
-  - Default is sibling: `<repo-parent>/<repo-name>-wt/<task-id>`.
+  - Default is sibling: `<current>/../<branch_name>` (worktree lives beside your main checkout and uses the branch path).
+  - Directory collisions abort the command before invoking `git worktree add`.
   - Switch with `--wt-mode home|repo-subdir` at `add` time.
-  - All historical locations are auto‑detected for cleanup (`.mrtask/wt/<id>`, `$MRTASK_HOME/...`, `<repo>/.worktrees/<id>`, sibling).
+  - All historical locations are auto‑detected for cleanup (`.mrtask/wt/<id>`, `$MRTASK_HOME/...`, `<repo>/.worktrees/<id>`, `<repo-parent>/<branch_path>`, `<repo-parent>/<task-id>`, legacy `<repo-parent>/<repo-name>-wt/<id>`).
 
 - Target resolution (which task?):
   - Omitting an id on `pr/done/cancel/remove` resolves to the task of the current worktree/branch.
@@ -211,14 +212,14 @@ mrtask remove --taskid <short8>
 
 ## Worktree Layout (Before/After)
 
-Below shows how the filesystem changes with the default sibling placement. Replace `<repo>` with your repository name and `<task-id>` with the generated task id.
+Below shows how the filesystem changes with the default sibling placement. Replace `<repo>` with your repository name, `<task-id>` with the generated task id, and `<branch_path>` with the branch path (for example `feature/login-ui`).
 
 Example context
 
 ```text
 /projects/
   <repo>/            # your main working copy (on main)
-  <repo>-wt/         # worktrees live here (created on demand)
+  (no task worktrees yet)
 ```
 
 ### create — creates a sibling worktree (isolated)
@@ -252,14 +253,14 @@ After
         .mrtask/
           <task-id>.yml           # task metadata is versioned in main
 
-  <repo>-wt/
-    <task-id>/                    # new worktree checked out on feature/login-ui
+  feature/
+    login-ui/                     # new worktree checked out on feature/login-ui
       (package layout mirrors repo; edit here for this task)
 ```
 
 Notes
 - The task YAML is placed under the primary package (`packages/app/.mrtask/<task-id>.yml`) for discoverability on main.
-- The worktree is a separate checkout at `/projects/<repo>-wt/<task-id>`.
+- The worktree is a separate checkout at `/projects/<branch_path>` (e.g. `/projects/feature/login-ui`). Legacy directories under `/projects/<repo>-wt/<task-id>` or `/projects/<repo-parent>/<task-id>` are still detected for cleanup.
 
 ### add — add a shared (lightweight) task under an existing worktree
 
@@ -295,8 +296,8 @@ Before
   <repo>/
     packages/app/
       (no child YAML yet)
-  <repo>-wt/
-    <parent-id>/                 # existing worktree on feature/login-ui
+  feature/
+    login-ui/                   # existing worktree on feature/login-ui
 ```
 
 After
@@ -307,8 +308,8 @@ After
     packages/app/
       .mrtask/
         <child-id>.yml           # new shared subtask YAML on main
-  <repo>-wt/
-    <parent-id>/                 # unchanged (no new worktree is created)
+  feature/
+    login-ui/                    # unchanged (no new worktree is created)
       .mrtask/dep-fence.config.ts  # guards updated to union of open tasks
 ```
 
@@ -331,8 +332,7 @@ Before
   <repo>/
     packages/app/.mrtask/
       <task-id>.yml
-  <repo>-wt/
-    <task-id>/
+  <branch_path>/
 ```
 
 After
@@ -343,8 +343,7 @@ After
     packages/app/.mrtask/
       done/
         <task-id>.yml             # archived record
-  <repo>-wt/
-    (worktree removed)
+  <branch_path>/ (worktree removed)
 ```
 
 ### cancel — removes worktree, archives YAML to cancel/
@@ -362,8 +361,7 @@ Before
   <repo>/
     packages/app/.mrtask/
       <task-id>.yml
-  <repo>-wt/
-    <task-id>/
+  <branch_path>/
 ```
 
 After
@@ -374,8 +372,7 @@ After
     packages/app/.mrtask/
       cancel/
         <task-id>.yml             # archived as canceled
-  <repo>-wt/
-    (worktree removed)
+  <branch_path>/ (worktree removed)
 ```
 
 ### remove — removes worktree and deletes YAML
@@ -393,8 +390,7 @@ Before
   <repo>/
     packages/app/.mrtask/
       <task-id>.yml
-  <repo>-wt/
-    <task-id>/
+  <branch_path>/
 ```
 
 After
@@ -404,13 +400,12 @@ After
   <repo>/
     packages/app/.mrtask/
       (no <task-id>.yml)          # record removed
-  <repo>-wt/
-    (worktree removed)
+  <branch_path>/ (worktree removed)
 ```
 
 Tips
 - You can target a task by omitting the id inside its worktree, or explicitly via `--task`, `--taskid`, `--branch`, or `--worktree`.
-- Historical locations for worktrees (`.mrtask/wt/<id>`, `$MRTASK_HOME/...`, `<repo>/.worktrees/<id>`) are also detected during cleanup.
+- Historical locations for worktrees (`.mrtask/wt/<id>`, `$MRTASK_HOME/...`, `<repo>/.worktrees/<id>`, `<repo-parent>/<branch_path>`, `<repo-parent>/<task-id>`, legacy `<repo-parent>/<repo-name>-wt/<id>`) are also detected during cleanup.
 
 ---
 
